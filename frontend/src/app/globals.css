@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── CERR marka ranglari ── */
+  --color-cerr-navy: #0b1738;
+  --color-cerr-navy-dark: #070d21;
+  --color-cerr-bg: #ffffff;
+
+  /* ── Dizayn tizimi — jaqtı tema, kók aktsent ──
+     Bul atlar komponentler ishinde keń qollanıladı (bg-void, text-ink, ...),
+     sonlıqtan mánileri bir jerde ózgertiledi. */
+  --color-void: #0b1738; /* eń qara neytral — kontrast tekst hám markazlıq elementler ushın */
+  --color-ink: #101a33; /* tiykarǵı tekst */
+  --color-ink-2: #43507a; /* ekinshi dárejeli tekst */
+  --color-ink-3: #7883a6; /* úshinshi dárejeli / mút tekst */
+  --color-raised: #eef1f8; /* jaqtı kóterilgen bet (belsendi emes taymer/tugma) */
+  --color-abyss: #ffffff; /* shisha panellerdiń tiykarǵı beti */
+  --color-deep: #f8fafc; /* keste bası h.t.b. */
+  --color-edge: #c7d1e6; /* ring/shegara reńi */
+  --color-hairline: #e2e8f5; /* jińishke ajıratqısh sızıq */
+
+  --color-cyan: #2563eb; /* tiykarǵı kók aktsent */
+  --color-iris: #4f46e5; /* ekinshi kók-indigo aktsent */
+  --color-violet: #7c3aed; /* AI belgileri */
+  --color-magenta: #0ea5e9; /* logotip gradienti — kók shańaraqta */
+  --color-crimson: #dc2626; /* qátelik / kritikалıq */
+  --color-coral: #ef4444; /* qátelik tekst */
+}
+
+@layer base {
+  body {
+    background-color: var(--color-cerr-bg);
+    color: var(--color-ink);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/*
+ * Bul klasslar `@layer components` ishinde — Tailwind'diń óz qatlam
+ * tártibinde (theme, base, components, utilities) `utilities`den TÓMEN
+ * turadı. Solай etip, bir elementte usı klasslar menen Tailwind
+ * utility'si (mısalı `absolute`, `pointer-events-auto`) qatar kelse,
+ * utility hámishe jeńedi — bul CSS cascade layers'tıń ózgermeytuǵın
+ * qaǵıydası. Bul jerden shıǵarılıp, "jalań" (layer'sız) jazılsa, olar
+ * KERISINSHE hámishe utility'den jeńip shıǵadı — dál usı sebepten
+ * `.glass-top-glow`'dıń `position: relative`si `absolute` klassın
+ * "átirapqa" (layout aǵımına) qaytarıp jiberetuǵın edi.
+ */
+@layer components {
+  .cerr-sidebar {
+    background-color: #0b1738;
+    color: #ffffff;
+  }
+
+  .cerr-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+  }
+
+  /* ── Tabular sanlar ── */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* ── Gradient tekst ── */
+  .text-gradient {
+    background-image: linear-gradient(120deg, var(--color-cyan), var(--color-iris));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* ── Shisha panel ── */
+  .glass {
+    background: color-mix(in oklab, white 86%, transparent);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid color-mix(in oklab, var(--color-void) 8%, transparent);
+    box-shadow:
+      0 1px 1px color-mix(in oklab, var(--color-void) 4%, transparent),
+      0 12px 32px -14px color-mix(in oklab, var(--color-void) 22%, transparent);
+  }
+
+  .glass-top-glow {
+    position: relative;
+  }
+  .glass-top-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--color-cyan) 55%, transparent),
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  .glass-chip {
+    background: color-mix(in oklab, white 92%, transparent);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid color-mix(in oklab, var(--color-void) 8%, transparent);
+    box-shadow: 0 8px 24px -12px color-mix(in oklab, var(--color-void) 25%, transparent);
+  }
+
+  .glass-rail {
+    background: color-mix(in oklab, white 88%, transparent);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border: 1px solid color-mix(in oklab, var(--color-void) 8%, transparent);
+    border-radius: 24px;
+    box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--color-void) 30%, transparent);
+    pointer-events: auto;
+  }
+
+  /* Panellar arasındaǵı boslıq tikkeley xaritaǵa ótiwi ushın */
+  .overlay-pass {
+    pointer-events: none;
+  }
+
+  /* ── Fon ilgek — immersiv sahifa ── */
+  .app-shell {
+    background: var(--color-cerr-bg);
+  }
+
+  /* ── Jińishke skroll ── */
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-void) 22%, transparent) transparent;
+  }
+  .thin-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-void) 20%, transparent);
+    border-radius: 9999px;
+  }
+  .thin-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .district-path {
+    cursor: pointer;
+    outline: none;
+    transition: filter 0.25s ease, opacity 0.3s ease;
+  }
+  .district-path:focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+
+  .district-edge {
+    /* Bul konturlar STROKE-ONLY: `d` — tolıq jabıq poligon, sonlıqtan
+       `fill: none` bolmasa SVG ony ONDIRILGEN QARA TÚSKE (default fill)
+       boyawshı edi — dál usı sebepten karta pastel reńlerge qaramastan
+       qara kórinip turǵan edi. */
+    fill: none;
+    pointer-events: none;
+  }
+
+  .district-marching {
+    fill: none;
+    stroke-dasharray: 6 4;
+    animation: district-march 20s linear infinite;
+    pointer-events: none;
+  }
+
+  /* ── Aurora fon (kirüw/immersiv sahifa) ── */
+  .aurora-field {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: var(--color-cerr-bg);
+  }
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(85px);
+  }
+  .grid-veil {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(color-mix(in oklab, var(--color-void) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in oklab, var(--color-void) 5%, transparent) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, black 35%, transparent 88%);
+  }
+  .noise-veil {
+    position: absolute;
+    inset: 0;
+    opacity: 0.025;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@keyframes district-march {
+  to {
+    stroke-dashoffset: -400;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.65;
+
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}

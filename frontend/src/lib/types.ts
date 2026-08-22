@@ -1,0 +1,43 @@
+// Platformaning umumiy domen modeli. Backend (FastAPI) shu shakllarni qaytaradi.
+
+export type StatusId = "completed" | "in_progress" | "at_risk" | "critical";
+
+export type Role = "admin" | "viewer";
+
+/** AI qaytaradigan grafik spetsifikatsiyasi — chat javobida chizmalar shundan yasaladi. */
+/**
+ * `bar` — gorizontal ustunlar (uzun nomlar uchun), `grouped-bar` — vertikal
+ * guruhlangan, `dumbbell` — bir obyektning ikki qiymati (tuman ↔ respublika).
+ * Doiraviy (pie/donut) shakl ataylab yo'q: 7 ta yaqin qiymatni burchak orqali
+ * taqqoslash noto'g'ri o'qiladi.
+ */
+export type ChartKind = "line" | "area" | "bar" | "grouped-bar" | "dumbbell" | "diverging-bar";
+
+export interface ChartSeries {
+  key: string;
+  label: string;
+  color?: string;
+}
+
+export interface ChartSpec {
+  id: string;
+  kind: ChartKind;
+  title: string;
+  subtitle?: string;
+  unit?: string;
+  series: ChartSeries[];
+  /** Har bir yozuv: { label: string, [seriesKey]: number } */
+  data: Array<Record<string, string | number>>;
+}
+
+export interface SessionUser {
+  username: string;
+  fullName: string;
+  role: Role;
+  /**
+   * Backend bergan JWT. Admin yozuv amallari (Excel yuklash, ko'rsatkichni
+   * tayanch sohaga biriktirish) shusiz ishlamaydi — backend ulanmaganda
+   * bo'sh qoladi.
+   */
+  token?: string;
+}
