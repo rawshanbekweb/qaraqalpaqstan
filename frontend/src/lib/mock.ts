@@ -210,6 +210,8 @@ export function mockMapLayer(moduleId: string | null, year: number | null): MapL
     yoy: r.prev > 0 ? ((r.value - r.prev) / r.prev) * 100 : null,
     intensity: max > 0 ? r.value / max : null,
     rank: rankOf.get(r.d.id) ?? null,
+    plan: null,
+    status: null,
   }));
 
   return {
@@ -279,6 +281,7 @@ export function mockDistrictProfile(districtId: string, year: number | null): Di
     year: y,
     modules,
     avg_growth: avgGrowth,
+    operational: [],
   };
 }
 
@@ -308,6 +311,8 @@ export function mockSeries(
       yoy: prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : null,
       sources: 1,
       aggregated: !districtId,
+      plan: null,
+      status: null,
     };
   });
 

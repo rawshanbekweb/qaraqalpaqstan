@@ -7,45 +7,32 @@ import { usePathname, useRouter } from "next/navigation";
 import { DISTRICT_BY_ID } from "@/data/districts";
 import { HEADER_HEIGHT } from "@/lib/layout";
 import { useDashboard } from "@/lib/store";
-import { useStatsMeta } from "@/lib/stats";
 import { clearSession, getSession } from "@/lib/session";
-import { Segmented, YearScale } from "@/components/ui/primitives";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { warmUpApi } from "@/lib/api";
+import { useEffect, useSyncExternalStore } from "react";
 
 /** useSyncExternalStore uchun o'zgarmas "obuna bo'lmaslik" funksiyasi. */
 const NO_SUBSCRIBE = () => () => {};
 
 /**
  * Tolıq enli, birden-bir joqarǵı panel — barlıq sahifalarda birdey orında
- * turadı (logo + filtrler + admin/shıǵıw), `NavDrawer` sol bağana onıń
- * ástinde baslanadı. `/login` hám `/admin` óz-ózinshe naviqasiyaǵa iye,
- * sonlıqtan bul jerde kórsetilmeydi.
- *
- * Filtr qatori (soha + jıl) tek Bas bette (`/`) mánige iye — basqa
- * sahifalarda (Tumanlar h.t.b.) óz aldına filtri bar.
+ * turadı (logo + admin/shıǵıw), `NavDrawer` sol bağana onıń ástinde
+ * baslanadı. `/login` hám `/admin` óz-ózinshe naviqasiyaǵa iye, sonlıqtan
+ * bul jerde kórsetilmeydi. Soha/jıl filtri hár sahifaniń ózinde (KPI,
+ * Tumanlar) — bul jerde qaytalanbaydı.
  */
 export function TopBar() {
   const pathname = usePathname();
-  const { moduleId, setModule, year, setYear, selectedDistrict, selectDistrict, setHighlighted, exitFocus } =
-    useDashboard();
+  const { selectedDistrict, selectDistrict } = useDashboard();
   const router = useRouter();
-  const { data: meta } = useStatsMeta();
   // Sessiya cookie'da — serverda o'qilmaydi, shuning uchun tashqi "store" sifatida
   const role = useSyncExternalStore(NO_SUBSCRIBE, () => getSession()?.role ?? null, () => null);
 
-  const showFilters = pathname === "/";
-  const modules = meta?.modules ?? [];
-  const active = modules.find((m) => m.id === moduleId) ?? modules[0];
-  // useEffect bog'liqligi — har renderda yangi massiv bo'lmasligi kerak
-  const years = useMemo(() => active?.years ?? [], [active]);
-
-  // Yil hali tanlanmagan yoki tanlangan soha shu yilni qamramaydi —
-  // eng yangi mavjud yilga tushamiz.
+  // Uxlab qolgan backendni oldindan uyg'otamiz (bepul hostingda muhim) —
+  // TopBar barlıq sahifalarda bir márte mount bolady (layout.tsx global).
   useEffect(() => {
-    if (!showFilters) return;
-    if (years.length === 0) return;
-    if (!years.includes(year)) setYear(years[years.length - 1]);
-  }, [showFilters, years, year, setYear]);
+    warmUpApi();
+  }, []);
 
   if (pathname === "/login" || pathname === "/admin" || pathname?.startsWith("/admin/")) {
     return null;
@@ -58,15 +45,9 @@ export function TopBar() {
     >
       {/* Brend */}
       <Link
-        href="/"
+        href="/dashboard"
         className="flex shrink-0 items-center gap-2.5"
-        onClick={() => {
-          // Xarita "óz halına" qaytsın — tańlaw/fokus tazalanadı, kamera
-          // ózi standart kórinis penen qayta esaplanadı.
-          selectDistrict(null);
-          setHighlighted([]);
-          exitFocus();
-        }}
+        onClick={() => selectDistrict(null)}
       >
         <div className="relative grid size-10 place-items-center rounded-xl bg-gradient-to-br from-cyan via-iris to-magenta">
           <Radio size={18} className="text-void" strokeWidth={2.4} />
@@ -84,41 +65,22 @@ export function TopBar() {
         </div>
       </Link>
 
-      {/* Filtrlar — bir qatorda, sıymasa gorizontal aylantiriladi (tómenge
-          túspeydi) */}
-      {showFilters ? (
-        <div className="thin-scroll flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
-          {modules.length > 0 && (
-            <Segmented<string>
-              layoutId="module-filter"
-              size="sm"
-              value={active?.id ?? moduleId}
-              onChange={setModule}
-              options={modules.map((m) => ({ value: m.id, label: m.short, color: m.color }))}
-            />
-          )}
-
-          <YearScale years={years} value={year} onChange={setYear} />
-
-          {selectedDistrict && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              onClick={() => selectDistrict(null)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cyan/12 px-3 py-1.5 text-[12.5px] font-semibold text-cyan ring-1 ring-cyan/35 transition hover:bg-cyan/20"
-            >
-              <MapPin size={12} />
-              {DISTRICT_BY_ID[selectedDistrict]?.name}
-              <span className="text-cyan/60">✕</span>
-            </motion.button>
-          )}
-        </div>
-      ) : (
-        <div className="flex-1" />
-      )}
+      <div className="flex-1" />
 
       {/* O'ng tomon */}
       <div className="flex shrink-0 items-center gap-2">
+        {selectedDistrict && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={() => selectDistrict(null)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cyan/12 px-3 py-1.5 text-[12.5px] font-semibold text-cyan ring-1 ring-cyan/35 transition hover:bg-cyan/20"
+          >
+            <MapPin size={12} />
+            {DISTRICT_BY_ID[selectedDistrict]?.name}
+            <span className="text-cyan/60">✕</span>
+          </motion.button>
+        )}
         {role === "admin" && (
           <Link
             href="/admin"

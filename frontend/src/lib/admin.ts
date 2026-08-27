@@ -50,6 +50,8 @@ export interface UploadResult {
   korsetkish: number;
   olshov: number;
   otkazib_yuborilgan: number;
+  sebep_belgisiz_rayon: number;
+  sebep_qaytalanma: number;
 }
 
 async function readError(res: Response): Promise<string> {

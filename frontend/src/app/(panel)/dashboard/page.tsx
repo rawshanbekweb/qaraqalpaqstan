@@ -1,14 +1,28 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
 import { useDashboard } from "@/lib/store";
 import { useDistrictProfile, useOverview, useSeries, useStatsMeta, shortUnit } from "@/lib/stats";
 import { Segmented, YearScale } from "@/components/ui/primitives";
 import { HeroFigure, StatTile } from "@/components/charts/StatTile";
 import { ChartRenderer } from "@/components/charts/ChartRenderer";
+import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
 import type { ChartSpec } from "@/lib/types";
-import { trim } from "@/lib/utils";
+import { compact, trim } from "@/lib/utils";
+
+interface ModuleRow {
+  key: string;
+  name: string;
+  color: string;
+  unit: string;
+  value: number;
+  yoy: number | null;
+  share: number | null;
+  rank: number | null;
+  of: number | null;
+  leaderName: string | null;
+}
 
 /**
  * KPI paneli — tiykarǵı ekonomikalıq kórsetkishler.
@@ -19,6 +33,7 @@ import { trim } from "@/lib/utils";
  */
 export default function DashboardPage() {
   const { moduleId, setModule, year, setYear, selectedDistrict, selectDistrict } = useDashboard();
+  const [view, setView] = useState<"cards" | "table">("cards");
   const { data: meta } = useStatsMeta();
   const { data: overview } = useOverview(year || null);
   const { data: profile } = useDistrictProfile(selectedDistrict, year || null);
@@ -64,6 +79,110 @@ export default function DashboardPage() {
           data: om.trend.map((t) => ({ label: String(t.year), value: t.value })),
         }
       : null;
+
+  const moduleRows: ModuleRow[] = useMemo(() => {
+    if (profile) {
+      return profile.modules.map((m) => ({
+        key: m.module,
+        name: m.name,
+        color: m.color,
+        unit: shortUnit(m.unit),
+        value: m.value,
+        yoy: m.yoy,
+        share: m.share,
+        rank: m.rank,
+        of: m.of,
+        leaderName: null,
+      }));
+    }
+    return (overview?.modules ?? []).map((m) => ({
+      key: m.module,
+      name: m.name,
+      color: m.color,
+      unit: shortUnit(m.unit),
+      value: m.value,
+      yoy: m.yoy,
+      share: null,
+      rank: null,
+      of: null,
+      leaderName: m.leader?.name ?? null,
+    }));
+  }, [profile, overview]);
+
+  const moduleColumns: DataTableColumn<ModuleRow>[] = useMemo(() => {
+    const cols: DataTableColumn<ModuleRow>[] = [
+      {
+        key: "name",
+        header: "Taraw",
+        sortValue: (r) => r.name,
+        searchValue: (r) => r.name,
+        render: (r) => (
+          <span className="flex items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full" style={{ background: r.color }} />
+            <span className="font-medium text-ink">{r.name}</span>
+          </span>
+        ),
+      },
+      {
+        key: "value",
+        header: "Kólemi",
+        align: "right",
+        sortValue: (r) => r.value,
+        render: (r) => (
+          <span className="tnum">
+            {compact(r.value)} <span className="text-[11px] text-ink-3">{r.unit}</span>
+          </span>
+        ),
+      },
+      {
+        key: "yoy",
+        header: "Ósiw, %",
+        align: "right",
+        sortValue: (r) => r.yoy,
+        render: (r) => cellNum(r.yoy, (n) => `${n > 0 ? "+" : ""}${trim(n)}%`),
+      },
+    ];
+    if (profile) {
+      cols.push(
+        {
+          key: "share",
+          header: "Úlesi, %",
+          align: "right",
+          sortValue: (r) => r.share,
+          render: (r) => cellNum(r.share, (n) => `${trim(n)}%`),
+        },
+        {
+          key: "rank",
+          header: "Orın",
+          align: "right",
+          sortValue: (r) => r.rank,
+          render: (r) =>
+            r.rank === null ? (
+              <span className="text-ink-3">—</span>
+            ) : (
+              <span className="tnum">
+                {r.rank}
+                {r.of ? `/${r.of}` : ""}
+              </span>
+            ),
+        },
+      );
+    } else {
+      cols.push({
+        key: "leader",
+        header: "Basshi tuman",
+        sortValue: (r) => r.leaderName,
+        searchValue: (r) => r.leaderName ?? "",
+        render: (r) =>
+          r.leaderName ? (
+            <span className="text-ink-2">{r.leaderName}</span>
+          ) : (
+            <span className="text-ink-3">—</span>
+          ),
+      });
+    }
+    return cols;
+  }, [profile]);
 
   const secondaryChart: ChartSpec | null = profile
     ? profile.modules.some((m) => m.share !== null)
@@ -133,11 +252,22 @@ export default function DashboardPage() {
           />
         )}
         <YearScale years={years} value={year} onChange={setYear} />
+        <div className="flex-1" />
+        <Segmented<"cards" | "table">
+          layoutId="kpi-view"
+          size="sm"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "cards", label: "Kartalar" },
+            { value: "table", label: "Jadval" },
+          ]}
+        />
       </div>
 
       <HeroFigure
         label={dm?.name ?? om?.name ?? activeModule?.name ?? "Kólemi"}
-        value={dm?.value ?? om?.value ?? 0}
+        value={dm?.value ?? om?.value ?? null}
         suffix={unit}
         color={accent}
         caption={
@@ -150,18 +280,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
         <StatTile
           label={`${activeModule?.short ?? ""} ósiwi`}
-          value={dm?.yoy ?? om?.yoy ?? 0}
+          value={dm?.yoy ?? om?.yoy ?? null}
           unit="%"
-          delta={dm?.yoy ?? om?.yoy ?? undefined}
+          delta={dm?.yoy ?? om?.yoy ?? null}
           deltaLabel={`${year - 1}-jılǵa`}
           accent={accent}
           index={0}
         />
         <StatTile
           label="Ortasha ósiw"
-          value={avgGrowth ?? 0}
+          value={avgGrowth ?? null}
           unit="%"
-          delta={avgGrowth ?? undefined}
+          delta={avgGrowth ?? null}
           deltaLabel="barlıq tarawlar"
           accent="#059669"
           index={1}
@@ -171,7 +301,7 @@ export default function DashboardPage() {
           value={
             profile
               ? profile.modules.filter((m) => (m.yoy ?? 0) > 0).length
-              : (overview?.growing ?? 0)
+              : (overview?.growing ?? null)
           }
           digits={0}
           unit={profile ? "taraw" : "rayon"}
@@ -183,7 +313,7 @@ export default function DashboardPage() {
           value={
             profile
               ? profile.modules.filter((m) => (m.yoy ?? 0) < 0).length
-              : (overview?.declining ?? 0)
+              : (overview?.declining ?? null)
           }
           digits={0}
           unit={profile ? "taraw" : "rayon"}
@@ -193,10 +323,22 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-5 pb-2 lg:grid-cols-2">
-        {trendChart && <ChartRenderer spec={trendChart} />}
-        {secondaryChart && <ChartRenderer spec={secondaryChart} />}
-      </div>
+      {view === "table" ? (
+        <DataTable
+          columns={moduleColumns}
+          rows={moduleRows}
+          getRowKey={(r) => r.key}
+          searchPlaceholder="Taraw izlew…"
+          exportName={
+            profile ? `${profile.district.name}-kpi-${year}` : `respublika-kpi-${year}`
+          }
+        />
+      ) : (
+        <div className="grid gap-5 pb-2 lg:grid-cols-2">
+          {trendChart && <ChartRenderer spec={trendChart} />}
+          {secondaryChart && <ChartRenderer spec={secondaryChart} />}
+        </div>
+      )}
     </div>
   );
 }

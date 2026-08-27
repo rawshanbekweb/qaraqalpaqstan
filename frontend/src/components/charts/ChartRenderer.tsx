@@ -122,7 +122,11 @@ function TableView({ spec }: { spec: ChartSpec }) {
               <td className="px-2.5 py-1.5 text-ink-2">{String(row.label)}</td>
               {spec.series.map((s) => (
                 <td key={s.key} className="tnum px-2.5 py-1.5 text-right text-ink">
-                  {trim(Number(row[s.key] ?? 0))}
+                  {row[s.key] === null || row[s.key] === undefined ? (
+                    <span className="text-ink-3">—</span>
+                  ) : (
+                    trim(Number(row[s.key]))
+                  )}
                 </td>
               ))}
             </tr>

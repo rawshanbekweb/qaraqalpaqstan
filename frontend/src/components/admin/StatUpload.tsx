@@ -167,6 +167,17 @@ export function StatUpload({
                 tone={result.otkazib_yuborilgan ? "amber" : "flat"}
               />
             </div>
+
+            {result.otkazib_yuborilgan > 0 && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-3">
+                {result.sebep_belgisiz_rayon > 0 && (
+                  <span>{result.sebep_belgisiz_rayon} ta: belgisiz rayon</span>
+                )}
+                {result.sebep_qaytalanma > 0 && (
+                  <span>{result.sebep_qaytalanma} ta: qaytalanma</span>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

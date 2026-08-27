@@ -1,10 +1,12 @@
 """
 Excel'dan yuklangan haqiqiy statistika ustidan agregatsiyalar.
 
-Eski `services/analytics.py` reja↔amalda modeli bilan ishlaydi; manba
-statistikada esa reja yo'q — faqat o'lchangan qiymat. Shuning uchun bu
-yerdagi ko'rsatkichlar boshqacha: qiymat, o'tgan yilga nisbatan o'sish,
-respublikadagi ulush va o'rin.
+109 ta tarixiy fayl reja tushunchasini bilmaydi — faqat o'lchangan qiymat.
+2026-jıl operativ KPI fayllari (`ingest/kpi2026.py`) esa Reja/Fakt bilan
+keladi va `StatObservation.plan_value` ga yoziladi. Shuning uchun har bir
+ko'rsatkichda `plan`/`status` bo'lishi SHART emas — mavjud bo'lganda
+`plan_status()` orqali hisoblanadi, bo'lmasa `None` (frontend belgi
+ko'rsatmaydi).
 
 Manbadagi davr turlari: to'liq yil (`year`), yil boshidan yig'indi
 (`ytd`, `period_no` — nechanchi oygacha), chorak (`quarter`) va oy
@@ -47,6 +49,20 @@ GROWTH_HINTS = ("ósim", "ósiw", "o'siw", "osim", "osiw", "%")
 
 
 # ── Davrlar ──────────────────────────────────────────────────────────
+
+
+def plan_status(value: float | None, plan: float | None, lower_is_better: bool) -> str | None:
+    """
+    Reja bajarilish holatı.
+
+    `plan` bolmasa (tariyxıy 109 fayldıń aksariyatinde solay) — `None`,
+    frontend belgi kórsetpeydi. Inflyatsiya kabi "pasayıwı jaqsı"
+    kórsetkishlerde bajarılıw — qiymet rejadan asıp KETPEwi.
+    """
+    if value is None or plan is None:
+        return None
+    fulfilled = value <= plan if lower_is_better else value >= plan
+    return "orınlandı" if fulfilled else "orınlanbadı"
 
 
 def period_label(period: str, period_no: int | None) -> str:
@@ -328,6 +344,7 @@ def series(
         StatObservation.period_no,
         StatObservation.district_id,
         StatObservation.value,
+        StatObservation.plan_value,
     ).where(StatObservation.indicator_id == indicator.id)
 
     aggregated = False
@@ -353,21 +370,27 @@ def series(
         stmt = stmt.where(StatObservation.year <= year_to)
 
     # Bir yilda ikkala davr turi uchrasa — to'liq yil ustun
-    by_year: dict[int, tuple[Period, dict[str | None, float]]] = {}
-    for year, period, period_no, did, value in db.execute(stmt).all():
+    by_year: dict[int, tuple[Period, dict[str | None, float], dict[str | None, float]]] = {}
+    for year, period, period_no, did, value, plan_value in db.execute(stmt).all():
         p = Period(year, period, period_no)
         current = by_year.get(year)
         if current is None or current[0].key < p.key:
-            current = (p, {})
+            current = (p, {}, {})
             by_year[year] = current
         elif not current[0].same_span(p):
             continue  # boshqa davr turi — aralashtirilmaydi
         current[1][did] = current[1].get(did, 0.0) + float(value or 0)
+        if plan_value is not None:
+            current[2][did] = current[2].get(did, 0.0) + float(plan_value)
 
     points: list[dict] = []
     for year in sorted(by_year):
-        p, values = by_year[year]
+        p, values, plans = by_year[year]
         value = sum(values.values())
+        # Faqat REJASI bar hám qiymeti bar hudıdlar bir-birine sáykes kelgende
+        # ǵana jámi rejanı esaplaymız — bolmasa "jámi fakt" penen "úlken bólegi
+        # ushın reja" salıstırılıp, nadurıs status shıǵıp qaladı.
+        plan = sum(plans.values()) if plans and plans.keys() == values.keys() else None
         previous = by_year.get(year - 1)
 
         yoy = None
@@ -392,6 +415,8 @@ def series(
                 "yoy": yoy,
                 "sources": len(values),
                 "aggregated": aggregated,
+                "plan": round(plan, 2) if plan is not None else None,
+                "status": plan_status(value, plan, indicator.lower_is_better),
             }
         )
     return points
@@ -402,12 +427,16 @@ def series(
 
 def _values_by_district(
     db: Session, indicator_id: int, year: int
-) -> tuple[dict[str, float], Period | None]:
+) -> tuple[dict[str, float], dict[str, float], Period | None]:
     period = periods_for(db, indicator_id).get(year)
     if period is None:
-        return {}, None
+        return {}, {}, None
     rows = db.execute(
-        select(StatObservation.district_id, func.sum(StatObservation.value))
+        select(
+            StatObservation.district_id,
+            func.sum(StatObservation.value),
+            func.sum(StatObservation.plan_value),
+        )
         .where(
             StatObservation.indicator_id == indicator_id,
             StatObservation.year == year,
@@ -416,7 +445,9 @@ def _values_by_district(
         )
         .group_by(StatObservation.district_id)
     ).all()
-    return {did: float(v or 0) for did, v in rows}, period
+    values = {did: float(v or 0) for did, v, _ in rows}
+    plans = {did: float(p) for did, _, p in rows if p is not None}
+    return values, plans, period
 
 
 def map_layer(db: Session, indicator: StatIndicator, year: int) -> dict:
@@ -424,10 +455,11 @@ def map_layer(db: Session, indicator: StatIndicator, year: int) -> dict:
     Xarita uchun tuman kesimi: qiymat, ulush, o'rin, o'sish va rang jadali.
 
     Rang jadali (`intensity`) eng katta qiymatga nisbatan hisoblanadi —
-    reja bo'lmagani uchun "bajarilish" tushunchasi bu yerda yo'q.
+    reja hammada ham bo'lmagani uchun rang shkalasi hajmga qaraydi.
+    Reja bor ko'rsatkichlarda (operativ KPI) `plan`/`status` ham qo'shiladi.
     """
-    values, period = _values_by_district(db, indicator.id, year)
-    prev_values, prev_period = _values_by_district(db, indicator.id, year - 1)
+    values, plans, period = _values_by_district(db, indicator.id, year)
+    prev_values, _, prev_period = _values_by_district(db, indicator.id, year - 1)
     comparable = bool(period and prev_period and period.same_span(prev_period))
 
     dists = district_names(db)
@@ -437,6 +469,7 @@ def map_layer(db: Session, indicator: StatIndicator, year: int) -> dict:
     rows = []
     for did, d in dists.items():
         value = values.get(did)
+        plan = plans.get(did)
         prev = prev_values.get(did) if comparable else None
         yoy = round((value - prev) / abs(prev) * 100, 2) if value is not None and prev else None
         rows.append(
@@ -447,6 +480,8 @@ def map_layer(db: Session, indicator: StatIndicator, year: int) -> dict:
                 "share": round(value / total * 100, 2) if value is not None and total else None,
                 "yoy": yoy,
                 "intensity": round(value / top, 4) if value is not None and top else None,
+                "plan": round(plan, 2) if plan is not None else None,
+                "status": plan_status(value, plan, indicator.lower_is_better),
             }
         )
 
@@ -474,6 +509,53 @@ def map_layer(db: Session, indicator: StatIndicator, year: int) -> dict:
     }
 
 
+# ── Operativ KPI (reja/fakt) ─────────────────────────────────────────
+
+
+def operational_kpis(db: Session, district_id: str | None) -> list[dict]:
+    """
+    2026-jıl operativ KPI kórsetkishleri — reja/fakt bar bolǵanları.
+
+    Bul ko'rsatkichler (`ingest/kpi2026.py`) tariyxıy 15+ jıllıq qatorǵa
+    iye emes, sonıń ushın `primary_indicators()` tańlawında hámishe
+    utılıp qaladı (ólshem sanı az) — soha kartasınıń kóp jıllıq trendin
+    olar menen almastırıw regressiya bolar edi. Sonıń ornına ayrıqsha,
+    qosımsha bólim retinde qaytarıladı: eń soңǵı nuqtası bar hám sonda
+    reja da bar bolǵan hár bir ko'rsatkish.
+    """
+    ind_ids = db.scalars(
+        select(StatObservation.indicator_id)
+        .where(StatObservation.plan_value.is_not(None))
+        .distinct()
+    ).all()
+
+    out: list[dict] = []
+    for ind_id in ind_ids:
+        ind = db.get(StatIndicator, ind_id)
+        if ind is None:
+            continue
+        points = series(db, ind, district_id=district_id)
+        if not points:
+            continue
+        current = points[-1]
+        if current["plan"] is None:
+            continue
+        out.append(
+            {
+                "indicator_id": ind.id,
+                "name": ind.name_kaa,
+                "unit": ind.unit,
+                "year": current["year"],
+                "caption": current["caption"],
+                "value": current["value"],
+                "plan": current["plan"],
+                "status": current["status"],
+            }
+        )
+    out.sort(key=lambda k: k["name"])
+    return out
+
+
 # ── Hudud profili ────────────────────────────────────────────────────
 
 
@@ -492,7 +574,7 @@ def district_profile(db: Session, district_id: str, year: int) -> dict | None:
         if current is None:
             continue
 
-        values, _ = _values_by_district(db, ind.id, year)
+        values, _, _ = _values_by_district(db, ind.id, year)
         total = sum(values.values())
         ordered = sorted(values.items(), key=lambda kv: kv[1], reverse=True)
         rank = next((i for i, (did, _) in enumerate(ordered, 1) if did == district_id), None)
@@ -513,6 +595,8 @@ def district_profile(db: Session, district_id: str, year: int) -> dict | None:
                 "rank": rank,
                 "of": len(ordered),
                 "trend": [p["value"] for p in points[-8:]],
+                "plan": current["plan"],
+                "status": current["status"],
             }
         )
     modules.sort(key=lambda m: m["sort"])
@@ -530,6 +614,7 @@ def district_profile(db: Session, district_id: str, year: int) -> dict | None:
         "year": year,
         "modules": modules,
         "avg_growth": round(sum(growths) / len(growths), 2) if growths else None,
+        "operational": operational_kpis(db, district_id),
     }
 
 
@@ -548,7 +633,7 @@ def overview(db: Session, year: int) -> dict:
         if current is None:
             continue
 
-        values, _ = _values_by_district(db, ind.id, year)
+        values, _, _ = _values_by_district(db, ind.id, year)
         ordered = sorted(values.items(), key=lambda kv: kv[1], reverse=True)
         dists = district_names(db)
 
@@ -572,6 +657,8 @@ def overview(db: Session, year: int) -> dict:
                 "yoy": current["yoy"],
                 "partial": current["partial"],
                 "caption": current["caption"],
+                "plan": current["plan"],
+                "status": current["status"],
                 "leader": named(ordered[0] if ordered else None),
                 "laggard": named(ordered[-1] if ordered else None),
                 "trend": [

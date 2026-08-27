@@ -18,24 +18,20 @@ import { Button, Field, Input, Segmented, Select, Textarea } from "@/components/
  * ham qolishi kerak, xotiradagi ro'yxat esa yo'qolib ketardi.
  */
 export function TaskBoard() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const configured = tasksConfigured();
+  const [tasks, setTasks] = useState<Task[]>(() => (configured ? [] : MOCK_TASKS));
   const [filter, setFilter] = useState<TaskStatusId | "all">("all");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(configured);
   // Backend jetimsiz bolǵanda yamasa tapsırma bermegende — demo dizim
   // kórsetiledi, panel bos qalmasın dep.
-  const [demoMode, setDemoMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(!configured);
   const { data: meta } = useStatsMeta();
   const modules = useMemo(() => meta?.modules ?? [], [meta]);
 
   const reload = useCallback(() => {
-    if (!tasksConfigured()) {
-      setTasks(MOCK_TASKS);
-      setDemoMode(true);
-      setLoading(false);
-      return;
-    }
+    if (!tasksConfigured()) return;
     listTasks()
       .then((rows) => {
         setTasks(rows.length > 0 ? rows : MOCK_TASKS);
@@ -50,7 +46,9 @@ export function TaskBoard() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(reload, [reload]);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const moduleName = useCallback(
     (id: string) => modules.find((m) => m.id === id)?.short ?? id,

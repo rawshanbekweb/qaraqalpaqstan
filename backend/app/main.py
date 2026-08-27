@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal, ensure_schema
 from app.routers import ai, auth, data, stats
 from app.seed import seed_reference, seed_users
 
@@ -16,7 +16,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Jadvallar mavjud bo'lmasa yaratiladi, ma'lumotnomalar va demo hisoblar sinxronlanadi."""
-    Base.metadata.create_all(engine)
+    ensure_schema()
     with SessionLocal() as db:
         seed_reference(db)
         seed_users(db)

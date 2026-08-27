@@ -83,6 +83,9 @@ export interface MapDistrict {
   /** Eng katta qiymatga nisbati, 0..1 */
   intensity: number | null;
   rank: number | null;
+  /** Reja bor bo'lsa (operativ KPI) — aks holda null */
+  plan: number | null;
+  status: PlanStatus | null;
 }
 
 export interface MapLayer {
@@ -110,6 +113,9 @@ export interface SeriesPoint {
   yoy: number | null;
   sources: number;
   aggregated: boolean;
+  /** Reja bor bo'lsa (operativ KPI) — aks holda null */
+  plan: number | null;
+  status: PlanStatus | null;
 }
 
 export interface Series {
@@ -136,11 +142,31 @@ export interface ProfileModule {
   trend: number[];
 }
 
+export type PlanStatus = "orınlandı" | "orınlanbadı";
+
+/**
+ * 2026-jıl operativ KPI kórsetkishi — reja (josspar) hám fakt.
+ *
+ * Tariyxıy ko'rsatkichlerden parqı: bul jerde `plan` HÁMİSHE bar (usı
+ * dizimge tek reja/fakt jubı bar ko'rsatkichler túsedi).
+ */
+export interface OperationalKpi {
+  indicator_id: number;
+  name: string;
+  unit: string;
+  year: number;
+  caption: string;
+  value: number;
+  plan: number;
+  status: PlanStatus;
+}
+
 export interface DistrictProfile {
   district: StatsDistrict;
   year: number;
   modules: ProfileModule[];
   avg_growth: number | null;
+  operational: OperationalKpi[];
 }
 
 export interface OverviewModule {
@@ -274,9 +300,14 @@ export function useOverview(year: number | null) {
   return useStats<Overview>(year ? "/overview" : null, { year: year ?? undefined });
 }
 
-export function useMapLayer(module: string | null, year: number | null) {
-  return useStats<MapLayer>(module && year ? "/map" : null, {
-    module: module ?? undefined,
+export function useMapLayer(
+  module: string | null,
+  year: number | null,
+  indicatorId?: number | null,
+) {
+  return useStats<MapLayer>((module || indicatorId) && year ? "/map" : null, {
+    module: indicatorId ? undefined : (module ?? undefined),
+    indicator_id: indicatorId ?? undefined,
     year: year ?? undefined,
   });
 }
@@ -292,9 +323,11 @@ export function useSeries(
   districtId: string | null,
   yearFrom?: number,
   yearTo?: number,
+  indicatorId?: number | null,
 ) {
-  return useStats<Series>(module ? "/series" : null, {
-    module: module ?? undefined,
+  return useStats<Series>(module || indicatorId ? "/series" : null, {
+    module: indicatorId ? undefined : (module ?? undefined),
+    indicator_id: indicatorId ?? undefined,
     district_id: districtId ?? undefined,
     year_from: yearFrom,
     year_to: yearTo,

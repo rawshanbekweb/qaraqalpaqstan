@@ -83,6 +83,9 @@ class Record:
     row: int = -1
     #: Varaq ichidagi ustma-ust jadval raqami (0 = birinchisi)
     block: int = 0
+    #: Josspar (reja) — faqat operativ KPI parserlari (`ingest/kpi2026.py`)
+    #: to'ldiradi, tariyxıy 109 fayl parserinde hamma vaqt `None`
+    plan_value: float | None = None
 
 
 def _clean(v) -> str:

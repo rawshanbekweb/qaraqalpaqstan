@@ -57,10 +57,10 @@ export default function AdminPage() {
     : "NEXT_PUBLIC_API_URL sazlanbaǵan — admin panel serversiz islemeydi";
 
   const tiles = [
-    { icon: Database, label: "Ólshemler", value: summary?.observations ?? 0 },
-    { icon: LayoutList, label: "Kórsetkishler", value: summary?.indicators ?? 0 },
-    { icon: MapPin, label: "Rayon kesimi bar", value: summary?.with_districts ?? 0 },
-    { icon: ClipboardList, label: "Aqırǵı jıl", value: summary?.latest_year ?? 0, plain: true },
+    { icon: Database, label: "Ólshemler", value: summary?.observations ?? null },
+    { icon: LayoutList, label: "Kórsetkishler", value: summary?.indicators ?? null },
+    { icon: MapPin, label: "Rayon kesimi bar", value: summary?.with_districts ?? null },
+    { icon: ClipboardList, label: "Aqırǵı jıl", value: summary?.latest_year ?? null, plain: true },
   ];
 
   return (
@@ -96,6 +96,8 @@ export default function AdminPage() {
                   <div className="text-[19px] leading-tight font-semibold text-ink">
                     {loading && !summary ? (
                       <Loader2 size={17} className="animate-spin text-ink-3" />
+                    ) : s.value === null ? (
+                      <span className="text-ink-3">—</span>
                     ) : s.plain ? (
                       s.value
                     ) : (

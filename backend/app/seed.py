@@ -17,7 +17,7 @@ from datetime import date
 
 from sqlalchemy import select, text
 
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal, ensure_schema
 from app.models import District, EconomicTask, Module, User
 from app.security import hash_password
 from app.services.stats import MODULE_META
@@ -206,7 +206,7 @@ def drop_legacy(db) -> tuple[int, int]:
 def main() -> None:
     reset = "--reset-demo" in sys.argv
 
-    Base.metadata.create_all(engine)
+    ensure_schema()
     with SessionLocal() as db:
         seed_reference(db)
         if reset:

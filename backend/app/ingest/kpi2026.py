@@ -7,21 +7,26 @@ olar joriy jıldıń dawamındaǵı Reja/Fakt/Farq monitoring kestesi
 parseri (qaraqalpaq latini, tarixiy qatar format) olardı durıs oqıy
 almaydı: hudud atlarin tanımaydı hám Reja/Fakt bagаnalarin ajıratpaydı.
 
-Faqat "Fakt" dep belgilengen bagаnalar oqıladı — Reja (josspar),
-Kútiliw (bolжам) hám Farq bagаnaları qásten qaldırıladı, sebebi
-platforma "josspar" túsinigin ózinde saqlamaydı (README.md, tiykarǵı
-dizayn printsipi).
+"Fakt" bagаnası — `StatObservation.value`, ал sol dáwir toparındaǵı
+"Режа" bagаnası (bar bolsa) — `plan_value`. Kútiliw (bolжам) hám Farq
+bagаnaları hámme waqıt qásten qaldırıladı: olar ólshengen qiymet emes.
+
+Ishge tusiriw:
+    python -m app.ingest.kpi2026 <1_Экономика papkası> <4_Экспорт papkası>
 """
 
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 import pandas as pd
 
+from app.database import SessionLocal, ensure_schema
 from app.ingest.excel import Record, _clean, _numeric
 from app.ingest.districts_map import REPUBLIC
+from app.ingest.loader import keep_known, load_records
 
 #: Kirill matnındaǵı latın húrpler menen almasıw ("Aмударё" ~ "Амударё")
 _LOOKALIKE = str.maketrans({
@@ -118,6 +123,24 @@ def _ffill_row(df: pd.DataFrame, row: int) -> list[str]:
     return out
 
 
+def _find_plan_col(period_labels: list[str], subcol_labels: list[str], col: int) -> int | None:
+    """
+    `col` (Fakt bagаnası) meńzes dáwir toparı ishinde, oннан shepte
+    turǵan "Режа" bagаnasın izleydi.
+
+    Fayllarda dáwir toparı ishinde bagаnalar ádette "Режа, Факт, Фарқи"
+    (yamasa "Режа, Кутилиши, Фарқи") tártibinde keledi — sonlıqtan
+    izlew basqa dáwir toparına ótkende toqtaydı.
+    """
+    period = period_labels[col]
+    c = col - 1
+    while c >= 0 and period_labels[c] == period:
+        if subcol_labels[c] == "режа":
+            return c
+        c -= 1
+    return None
+
+
 def parse_kpi_sheet(
     path: Path,
     sheet: str,
@@ -146,6 +169,10 @@ def parse_kpi_sheet(
     df = pd.ExcelFile(path).parse(sheet, header=None)
     period_labels = _ffill_row(df, header_row)
     metric_labels = _ffill_row(df, metric_row) if metric_row is not None else None
+    subcol_labels = [
+        _clean(df.iat[subcol_row, c]).replace("\n", " ").strip().lower()
+        for c in range(df.shape[1])
+    ]
 
     records: list[Record] = []
     source = f"{path.name}#{sheet}"
@@ -158,7 +185,7 @@ def parse_kpi_sheet(
         did = None if district == REPUBLIC else district
 
         for col in range(label_col + 1, df.shape[1]):
-            subcol = _clean(df.iat[subcol_row, col]).replace("\n", " ").strip().lower()
+            subcol = subcol_labels[col]
             if subcol != "факт":
                 continue
             period = parse_period_ru(period_labels[col], default_year=default_year)
@@ -175,18 +202,24 @@ def parse_kpi_sheet(
             if val is None:
                 continue
 
+            plan_col = _find_plan_col(period_labels, subcol_labels, col)
+            plan_val = _numeric(df.iat[row, plan_col]) if plan_col is not None else None
+
             is_growth = bool(metric_labels) and "ўсиш" in metric_labels[col].lower()
             if is_growth:
                 if osim_title is None:
                     continue
                 indicator, unit, value = osim_title, "%", val * osim_scale
+                plan_value = plan_val * osim_scale if plan_val is not None else None
             else:
                 indicator, unit, value = hajmi_title, "mlrd. som", val
+                plan_value = plan_val
 
             records.append(Record(
                 category=category, indicator=indicator, unit=unit,
                 district_id=did, year=year, period=kind, period_no=no,
                 value=value, source=source, row=row, block=0,
+                plan_value=plan_value,
             ))
     return records
 
@@ -249,7 +282,11 @@ def parse_export_volume(path: Path, sheet: str) -> list[Record]:
         "19-avgust holatına" dep ashıq kórsetedi, sonlıqtan bul
         bolжам emes, sol kúngo shekemgi haqıyqıy jıyındı.
     "Баж-ши %" bagаnaları josspardıń orınlaniw dárejesi (KPI), ósim
-    páti emes — qaldırıladı.
+    páti emes — qaldırıladı, biraq тийкарǵы "Режа" (col6, sol dáwir
+    toparınıń ózinde, col7 "Амалда"dan aldın) endi `plan_value`
+    sıpatında saqlanadı. col2 "2026 йил (режа)" — jıllıq maqset,
+    lekin oǵan sáykes tolıq jıllıq fakt joq (jıl tamamlanbaǵan),
+    sonlıqtan bul qásten qaldırıladı: qiymatsiz reja saqlanbaydı.
     """
     df = pd.ExcelFile(path).parse(sheet, header=None)
     title = "2026-jıl eksport kólemi (operativ maǵlıwmat)"
@@ -265,10 +302,12 @@ def parse_export_volume(path: Path, sheet: str) -> list[Record]:
 
         fact_2026 = _numeric(df.iat[row, 7])
         if fact_2026 is not None:
+            plan_2026 = _numeric(df.iat[row, 6])
             records.append(Record(
                 category="05_S_rtq_Sawda", indicator=title, unit=unit,
                 district_id=did, year=2026, period="ytd", period_no=8,
                 value=fact_2026 / 1000, source=source, row=row, block=0,
+                plan_value=plan_2026 / 1000 if plan_2026 is not None else None,
             ))
 
         fact_2025 = _numeric(df.iat[row, 11])
@@ -287,15 +326,16 @@ def parse_new_exporters(path: Path, sheet: str) -> list[Record]:
 
     Eki Fakt bagаnası: "jańa eksportshılar sanı" (col3) hám
     "barlıq eksportshılar sanı" (col6), ekewi de "19-avgust
-    holatına" jıyındı-fakt (bolжам emes).
+    holatına" jıyındı-fakt (bolжам emes). Hár qaysısınıń aldında
+    "Реже" (col2 / col5) — sonı `plan_value` sıpatında saqlaymız.
     """
     df = pd.ExcelFile(path).parse(sheet, header=None)
     source = f"{path.name}#{sheet}"
     records: list[Record] = []
 
     cols = [
-        (3, "2026-jıl jańa eksportshılar sanı (operativ maǵlıwmat)"),
-        (6, "2026-jıl barlıq eksportshılar sanı (operativ maǵlıwmat)"),
+        (3, 2, "2026-jıl jańa eksportshılar sanı (operativ maǵlıwmat)"),
+        (6, 5, "2026-jıl barlıq eksportshılar sanı (operativ maǵlıwmat)"),
     ]
 
     for row in range(7, len(df)):
@@ -304,7 +344,7 @@ def parse_new_exporters(path: Path, sheet: str) -> list[Record]:
             continue
         did = None if district == REPUBLIC else district
 
-        for col, title in cols:
+        for col, plan_col, title in cols:
             val = _numeric(df.iat[row, col])
             if val is None:
                 continue
@@ -312,6 +352,7 @@ def parse_new_exporters(path: Path, sheet: str) -> list[Record]:
                 category="05_S_rtq_Sawda", indicator=title, unit="dana",
                 district_id=did, year=2026, period="ytd", period_no=8,
                 value=val, source=source, row=row, block=0,
+                plan_value=_numeric(df.iat[row, plan_col]),
             ))
     return records
 
@@ -320,3 +361,31 @@ def collect_export(root: Path) -> list[Record]:
     out = parse_export_volume(root / "1_Экспорт+.xlsx", "экспорт 500 млн. долл.")
     out += parse_new_exporters(root / "5_Новые_экспортеры+ .xlsx", "83 жана экспортер")
     return out
+
+
+def main() -> None:
+    if len(sys.argv) < 3:
+        raise SystemExit(
+            "qollanılıwı: python -m app.ingest.kpi2026 <1_Экономика papkası> "
+            "<4_Экспорт papkası>"
+        )
+    economy_root, export_root = Path(sys.argv[1]), Path(sys.argv[2])
+    for root in (economy_root, export_root):
+        if not root.exists():
+            raise SystemExit(f"papka tabılmadı: {root}")
+
+    records = keep_known(collect(economy_root) + collect_export(export_root))
+    if not records:
+        raise SystemExit("hesh bir jazba shıqmadı")
+
+    ensure_schema()
+    with SessionLocal() as db:
+        stats = load_records(records, db, replace_all=False)
+
+    print("Operativ KPI júklendi.")
+    for k, v in stats.items():
+        print(f"  {k:22} {v}")
+
+
+if __name__ == "__main__":
+    main()

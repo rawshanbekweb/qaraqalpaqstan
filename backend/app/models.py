@@ -149,6 +149,8 @@ class StatObservation(Base):
     period: Mapped[str] = mapped_column(String(10), default="year")
     period_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
     value: Mapped[float] = mapped_column(Float, nullable=False)
+    #: Josspar (reja) — operativ KPI fayllarında bar, tariyxıy fayllarda joq
+    plan_value: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     indicator: Mapped[StatIndicator] = relationship(back_populates="observations")
 

@@ -22,17 +22,18 @@ export function StatTile({
   index = 0,
 }: {
   label: string;
-  value: number;
+  /** `null` — mánis háli joq (júklenbekte yamasa esaplanbaydı), "0" emes "—" kórsetiledi */
+  value: number | null;
   unit?: string;
   digits?: number;
-  delta?: number;
+  delta?: number | null;
   deltaLabel?: string;
   upIsGood?: boolean;
   spark?: number[];
   accent?: string;
   index?: number;
 }) {
-  const dir = delta === undefined ? 0 : delta > 0.05 ? 1 : delta < -0.05 ? -1 : 0;
+  const dir = !delta ? 0 : delta > 0.05 ? 1 : delta < -0.05 ? -1 : 0;
   const good = dir === 0 ? null : upIsGood ? dir > 0 : dir < 0;
   const deltaColor = good === null ? "#8fa3d4" : good ? "#0ca30c" : "#d03b3b";
   const DeltaIcon = dir === 0 ? Minus : dir > 0 ? ArrowUpRight : ArrowDownRight;
@@ -48,12 +49,12 @@ export function StatTile({
 
       <div className="mt-1.5 flex items-baseline gap-1.5">
         <span className="text-[25px] leading-none font-semibold tracking-tight text-ink">
-          <Counter value={value} digits={digits} />
+          {value === null ? <span className="text-ink-3">—</span> : <Counter value={value} digits={digits} />}
         </span>
         {unit ? <span className="text-[12.5px] text-ink-3">{unit}</span> : null}
       </div>
 
-      {delta !== undefined ? (
+      {delta !== undefined && delta !== null ? (
         <div className="mt-2 flex items-center gap-1.5">
           <DeltaIcon size={13} style={{ color: deltaColor }} />
           <span className="tnum text-[12.5px] font-semibold" style={{ color: deltaColor }}>
@@ -115,7 +116,8 @@ export function HeroFigure({
   className,
 }: {
   label: string;
-  value: number;
+  /** `null` — mánis háli joq, "0" emes "—" kórsetiledi */
+  value: number | null;
   suffix?: string;
   color: string;
   caption?: string;
@@ -136,7 +138,11 @@ export function HeroFigure({
         <div className="text-[12.5px] tracking-wide text-ink-3 uppercase">{label}</div>
         <div className="mt-1.5 flex items-baseline gap-2">
           <span className="text-[52px] leading-[0.95] font-semibold tracking-tight text-ink">
-            <Counter value={value} digits={1} duration={1.4} />
+            {value === null ? (
+              <span className="text-ink-3">—</span>
+            ) : (
+              <Counter value={value} digits={1} duration={1.4} />
+            )}
           </span>
           <span className="text-2xl font-medium text-ink-3">{suffix}</span>
         </div>

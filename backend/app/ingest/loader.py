@@ -20,7 +20,7 @@ from pathlib import Path
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal, ensure_schema
 from app.ingest.excel import Record, parse_tree
 from app.models import District, StatCategory, StatIndicator, StatObservation
 
@@ -127,7 +127,14 @@ def load_records(
     yuborardi.
     """
     if not records:
-        return {"kategoriya": 0, "korsetkish": 0, "olshov": 0, "otkazib_yuborilgan": 0}
+        return {
+            "kategoriya": 0,
+            "korsetkish": 0,
+            "olshov": 0,
+            "otkazib_yuborilgan": 0,
+            "sebep_belgisiz_rayon": 0,
+            "sebep_qaytalanma": 0,
+        }
 
     known_districts = {d.id for d in db.scalars(select(District))}
     if not known_districts:
@@ -175,20 +182,23 @@ def load_records(
     db.flush()
 
     seen: set[tuple] = set()
-    added = skipped = 0
+    added = 0
+    skipped_unknown_district = 0
+    skipped_duplicate = 0
     for r in records:
         did = r.district_id
         if did and did not in known_districts:
-            skipped += 1
+            skipped_unknown_district += 1
             continue
         key = (indicator_ids[record_slug(r)], did, r.year, r.period, r.period_no)
         if key in seen:  # bir xil o'lchov ikki faylda uchrashi mumkin
-            skipped += 1
+            skipped_duplicate += 1
             continue
         seen.add(key)
         db.add(StatObservation(
             indicator_id=key[0], district_id=did, year=r.year,
             period=r.period, period_no=r.period_no, value=r.value,
+            plan_value=r.plan_value,
         ))
         added += 1
 
@@ -212,7 +222,9 @@ def load_records(
         "kategoriya": len({r.category for r in records}),
         "korsetkish": len(indicator_ids),
         "olshov": added,
-        "otkazib_yuborilgan": skipped,
+        "otkazib_yuborilgan": skipped_unknown_district + skipped_duplicate,
+        "sebep_belgisiz_rayon": skipped_unknown_district,
+        "sebep_qaytalanma": skipped_duplicate,
         "eskirgen": orphans,
     }
 
@@ -237,7 +249,7 @@ def main() -> None:
     if not root.exists():
         raise SystemExit(f"papka topilmadi: {root}")
 
-    Base.metadata.create_all(engine)
+    ensure_schema()
     with SessionLocal() as db:
         stats = load(root, db)
 
