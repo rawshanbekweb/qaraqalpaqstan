@@ -21,7 +21,7 @@ const PER_PAGE = 25;
 /**
  * Barlıq 1084 ko'rsatkishti qidiriw hám tańlanǵannıń tolıq dereginiń
  * jadval kórinisi — jıllar boyınsha hám (bar bolsa) rayonlar boyınsha,
- * saralaw/filtrlew/CSV eksport penen. `IndicatorBrowser` (admin)
+ * saralaw/filtrlew/Excel eksport penen. `IndicatorBrowser` (admin)
  * naqshın qaytaradı, biraq admin huqıqı talap etilmeydi hám
  * "tayanch soha" biriktiriw joq — qatordı basıw kórsetkishti tańlaydı.
  */
@@ -201,7 +201,7 @@ export default function JadvalPage() {
       <div>
         <h1 className="text-2xl font-bold text-ink">Jadval</h1>
         <p className="text-sm text-ink-3">
-          1084 kórsetkishtiń tolıq dizimi — tańlań, jadval kórinisinde kóriń hám CSV sıpatında
+          1084 kórsetkishtiń tolıq dizimi — tańlań, jadval kórinisinde kóriń hám Excel sıpatında
           alıń
         </p>
       </div>

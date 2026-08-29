@@ -333,11 +333,10 @@ async def upload_workbook(
 @router.get("/export", dependencies=[Depends(require_admin)])
 def export_data(
     category_id: str | None = None,
-    fmt: str = Query(default="xlsx", pattern="^(xlsx|csv)$"),
     db: Session = Depends(get_db),
 ):
     """
-    Bazadagi o'lchovlarni Excel yoki CSV qilib qaytaradi.
+    Bazadagi o'lchovlarni Excel qilip qaytaradi.
 
     `category_id` berilmasa — butun baza. 24 mıńǵa jaqın qatar hátte
     xlsx'te de tez jaratıladı, sonlıqtan fon jumısı kerek emes.
@@ -372,16 +371,11 @@ def export_data(
     df = pd.DataFrame(rows, columns=columns)
 
     buf = io.BytesIO()
-    if fmt == "csv":
-        # BOM — Excel'de qaraqalpaq/kirill hárpleri buzılmay ashılıwı ushın
-        df.to_csv(buf, index=False, sep=";", encoding="utf-8-sig")
-        media = "text/csv"
-    else:
-        df.to_excel(buf, index=False, sheet_name="Statistika")
-        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    df.to_excel(buf, index=False, sheet_name="Statistika")
+    media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     buf.seek(0)
 
-    filename = f"statistika-{category_id or 'barlik'}.{fmt}"
+    filename = f"statistika-{category_id or 'barlik'}.xlsx"
     return StreamingResponse(
         buf,
         media_type=media,

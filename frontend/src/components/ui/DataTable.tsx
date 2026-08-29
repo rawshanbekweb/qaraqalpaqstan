@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Download, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { downloadCsv, toCsv } from "@/lib/csv";
+import { downloadExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/primitives";
 
@@ -14,15 +14,15 @@ export interface DataTableColumn<T> {
   sortValue?: (row: T) => number | string | null;
   /** Qidiriw ushın tekst — bolmasa `sortValue` isletiledi */
   searchValue?: (row: T) => string;
-  /** CSV eksportqa jazılatuǵın "tap" qıymet — bolmasa `sortValue` isletiledi */
-  csvValue?: (row: T) => string | number | null;
+  /** Excel eksportqa jazılatuǵın "tap" qıymet — bolmasa `sortValue` isletiledi */
+  excelValue?: (row: T) => string | number | null;
   render: (row: T) => ReactNode;
   hideByDefault?: boolean;
 }
 
 /**
  * Qayta isletiletuǵın jadval: saralaw, qidiriw, ustun jasırıw/kórsetiw hám
- * CSV eksport. Bos/`null` mánisler hámishe "—" — hesh qashan "0"ǵa
+ * Excel eksport. Bos/`null` mánisler hámishe "—" — hesh qashan "0"ǵa
  * aylanbaydı (`ChartRenderer` TableView hám `IndicatorBrowser` menen bir
  * uslub).
  */
@@ -42,7 +42,7 @@ export function DataTable<T>({
   searchable?: boolean;
   searchPlaceholder?: string;
   onRowClick?: (row: T) => void;
-  /** Berilse — eksport tugması kórinedi, fayl atı usı bolıp saqlanadı (`.csv` avtomatik) */
+  /** Berilse — eksport tugması kórinedi, fayl atı usı bolıp saqlanadı (`.xlsx` avtomatik) */
   exportName?: string;
   emptyLabel?: string;
 }) {
@@ -102,15 +102,15 @@ export function DataTable<T>({
     });
   }
 
-  function exportCsv() {
-    const csv = toCsv(
+  function exportExcel() {
+    downloadExcel(
+      `${exportName ?? "jadval"}.xlsx`,
       visibleColumns.map((c) => ({
         header: c.header,
-        value: (r: T) => (c.csvValue ?? c.sortValue)?.(r) ?? null,
+        value: (r: T) => (c.excelValue ?? c.sortValue)?.(r) ?? null,
       })),
       sorted,
     );
-    downloadCsv(`${exportName ?? "jadval"}.csv`, csv);
   }
 
   return (
@@ -162,12 +162,12 @@ export function DataTable<T>({
           {exportName && (
             <button
               type="button"
-              onClick={exportCsv}
+              onClick={exportExcel}
               className="inline-flex items-center gap-1.5 rounded-xl bg-abyss/70 px-3 py-2 text-[12.5px] text-ink-2 ring-1 ring-edge/60 transition hover:text-ink"
-              title="CSV sıpatında júklep alıw"
+              title="Excel sıpatında júklep alıw"
             >
               <Download size={13} />
-              CSV
+              Excel
             </button>
           )}
         </div>

@@ -151,14 +151,10 @@ export async function bulkSetIndicatorModule(
   return (await res.json()) as { updated: number; skipped: number };
 }
 
-/** Bazadagi statistikani Excel/CSV qilib yuklab oladi (klient brauzeriga). */
-export async function downloadExport(params: {
-  category_id?: string;
-  fmt?: "xlsx" | "csv";
-}): Promise<void> {
+/** Bazadagi statistikani Excel qilip yuklab oladi (klient brauzeriga). */
+export async function downloadExport(params: { category_id?: string }): Promise<void> {
   const qs = new URLSearchParams();
   if (params.category_id) qs.set("category_id", params.category_id);
-  qs.set("fmt", params.fmt ?? "xlsx");
 
   const res = await fetch(`${BASE}/api/stats/export?${qs.toString()}`, {
     headers: authHeaders(),
@@ -168,7 +164,7 @@ export async function downloadExport(params: {
 
   const blob = await res.blob();
   const disposition = res.headers.get("Content-Disposition") ?? "";
-  const filename = /filename="?([^"]+)"?/.exec(disposition)?.[1] ?? `statistika.${params.fmt ?? "xlsx"}`;
+  const filename = /filename="?([^"]+)"?/.exec(disposition)?.[1] ?? "statistika.xlsx";
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

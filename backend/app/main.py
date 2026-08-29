@@ -39,7 +39,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # Excel/CSV eksport faylı nomi usı sarlawhada keledi — brauzer ony
+    # Excel eksport faylı nomi usı sarlawhada keledi — brauzer ony
     # ashıq qoyılmasa aralıq-domen sorawda oqıy almaydı
     expose_headers=["Content-Disposition"],
 )

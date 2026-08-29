@@ -7,15 +7,14 @@ import type { StatsCategory } from "@/lib/stats";
 import { Button, Field, Select } from "@/components/ui/primitives";
 
 /**
- * Bazadagi statistikani Excel/CSV qilib yuklab olish.
+ * Bazadagi statistikani Excel qilip yuklab olish.
  *
- * `jadval` sahifasida bitta ko'rsatkichni CSV qilib olish bor edi —
+ * `jadval` sahifasida bitta ko'rsatkichni Excel qilib olish bor edi —
  * bul yerde bólim (yamasa butın baza) birden eksport etiledi, admin
  * ma'lumotni offline tekshirish yoki arxivlash uchun.
  */
 export function DataExport({ categories }: { categories: StatsCategory[] }) {
   const [categoryId, setCategoryId] = useState("");
-  const [fmt, setFmt] = useState<"xlsx" | "csv">("xlsx");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +22,7 @@ export function DataExport({ categories }: { categories: StatsCategory[] }) {
     setBusy(true);
     setError(null);
     try {
-      await downloadExport({ category_id: categoryId || undefined, fmt });
+      await downloadExport({ category_id: categoryId || undefined });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Eksport ámelge aspadı");
     } finally {
@@ -41,12 +40,6 @@ export function DataExport({ categories }: { categories: StatsCategory[] }) {
               {c.name}
             </option>
           ))}
-        </Select>
-      </Field>
-      <Field label="Format" className="w-36">
-        <Select value={fmt} onChange={(e) => setFmt(e.target.value as "xlsx" | "csv")}>
-          <option value="xlsx">Excel (.xlsx)</option>
-          <option value="csv">CSV</option>
         </Select>
       </Field>
       <Button type="button" onClick={run} disabled={busy}>
