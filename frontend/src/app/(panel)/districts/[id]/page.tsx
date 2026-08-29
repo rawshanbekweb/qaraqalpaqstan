@@ -18,6 +18,7 @@ import { Panel, Segmented, YearScale } from "@/components/ui/primitives";
 import { HeroFigure, StatTile } from "@/components/charts/StatTile";
 import { ChartRenderer } from "@/components/charts/ChartRenderer";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
+import { EXCEL_NUM_FMT, EXCEL_PERCENT_FMT, EXCEL_SIGNED_PERCENT_FMT } from "@/lib/excel";
 import type { ChartSpec } from "@/lib/types";
 import { compact, trim } from "@/lib/utils";
 
@@ -100,6 +101,7 @@ export default function DistrictProfilePage() {
         header: "Kólemi",
         align: "right",
         sortValue: (m) => m.value,
+        numFmt: EXCEL_NUM_FMT,
         render: (m) => cellNum(m.value, (n) => `${compact(n)} ${shortUnit(m.unit)}`),
       },
       {
@@ -107,6 +109,7 @@ export default function DistrictProfilePage() {
         header: "Ósiw, %",
         align: "right",
         sortValue: (m) => m.yoy,
+        numFmt: EXCEL_SIGNED_PERCENT_FMT,
         render: (m) => cellNum(m.yoy, (n) => `${n > 0 ? "+" : ""}${trim(n)}%`),
       },
       {
@@ -114,6 +117,7 @@ export default function DistrictProfilePage() {
         header: "Úlesi, %",
         align: "right",
         sortValue: (m) => m.share,
+        numFmt: EXCEL_PERCENT_FMT,
         render: (m) => cellNum(m.share, (n) => `${trim(n)}%`),
       },
       {
@@ -156,6 +160,7 @@ export default function DistrictProfilePage() {
         header: "Fakt",
         align: "right",
         sortValue: (k) => k.value,
+        numFmt: EXCEL_NUM_FMT,
         render: (k) => (
           <span className="tnum">
             {trim(k.value)} <span className="text-[11px] text-ink-3">{shortUnit(k.unit)}</span>
@@ -167,6 +172,7 @@ export default function DistrictProfilePage() {
         header: "Reja",
         align: "right",
         sortValue: (k) => k.plan,
+        numFmt: EXCEL_NUM_FMT,
         render: (k) => (
           <span className="tnum">
             {trim(k.plan)} <span className="text-[11px] text-ink-3">{shortUnit(k.unit)}</span>

@@ -16,6 +16,8 @@ export interface DataTableColumn<T> {
   searchValue?: (row: T) => string;
   /** Excel eksportqa jazılatuǵın "tap" qıymet — bolmasa `sortValue` isletiledi */
   excelValue?: (row: T) => string | number | null;
+  /** Excel eksportta sanlıq baǵanaǵа qollanılatuǵın format kodı (mısalı "#,##0.###") */
+  numFmt?: string;
   render: (row: T) => ReactNode;
   hideByDefault?: boolean;
 }
@@ -108,6 +110,7 @@ export function DataTable<T>({
       visibleColumns.map((c) => ({
         header: c.header,
         value: (r: T) => (c.excelValue ?? c.sortValue)?.(r) ?? null,
+        numFmt: c.numFmt,
       })),
       sorted,
     );

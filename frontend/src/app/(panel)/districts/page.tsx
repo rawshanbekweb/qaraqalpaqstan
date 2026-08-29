@@ -11,6 +11,7 @@ import { volumeColor } from "@/lib/scale";
 import { compact, trim } from "@/lib/utils";
 import { Panel, Segmented, YearScale } from "@/components/ui/primitives";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
+import { EXCEL_NUM_FMT, EXCEL_PERCENT_FMT, EXCEL_SIGNED_PERCENT_FMT } from "@/lib/excel";
 
 /**
  * Tumanlar ro'yxati — kartochkalar panjarasi.
@@ -101,6 +102,7 @@ export default function DistrictsPage() {
         header: "Qıymet",
         align: "right",
         sortValue: (r) => r.value,
+        numFmt: EXCEL_NUM_FMT,
         render: (r) =>
           cellNum(r.value, (n) => `${compact(n)} ${unit}`),
       },
@@ -109,6 +111,7 @@ export default function DistrictsPage() {
         header: "Úlesi, %",
         align: "right",
         sortValue: (r) => r.share,
+        numFmt: EXCEL_PERCENT_FMT,
         render: (r) => cellNum(r.share, (n) => `${trim(n)}%`),
       },
       {
@@ -116,6 +119,7 @@ export default function DistrictsPage() {
         header: "Ósiw, %",
         align: "right",
         sortValue: (r) => r.yoy,
+        numFmt: EXCEL_SIGNED_PERCENT_FMT,
         render: (r) => cellNum(r.yoy, (n) => `${n > 0 ? "+" : ""}${trim(n)}%`),
       },
       {
@@ -133,6 +137,7 @@ export default function DistrictsPage() {
           header: "Reja",
           align: "right",
           sortValue: (r) => r.plan,
+          numFmt: EXCEL_NUM_FMT,
           render: (r) => cellNum(r.plan, (n) => `${compact(n)} ${unit}`),
         },
         {

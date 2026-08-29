@@ -12,6 +12,8 @@ import re
 import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -378,9 +380,31 @@ def export_data(
         "Dáwir", "Dáwir nomeri", "Qıymet", "Reja", "Derek",
     ]
     df = pd.DataFrame(rows, columns=columns)
+    number_columns = {"Qıymet", "Reja"}
 
     buf = io.BytesIO()
-    df.to_excel(buf, index=False, sheet_name="Statistika")
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Statistika")
+        ws = writer.sheets["Statistika"]
+
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill("solid", fgColor="2563EB")
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(vertical="center")
+
+        for idx, name in enumerate(columns, start=1):
+            col_letter = get_column_letter(idx)
+            content_width = df[name].astype(str).map(len).max() if len(df) else 0
+            ws.column_dimensions[col_letter].width = min(max(len(name), content_width) + 2, 42)
+            if name in number_columns:
+                for cell in ws[col_letter][1:]:
+                    cell.number_format = "#,##0.###"
+
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+
     media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     buf.seek(0)
 

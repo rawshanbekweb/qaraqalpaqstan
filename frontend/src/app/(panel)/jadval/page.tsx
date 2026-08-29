@@ -14,6 +14,7 @@ import {
 } from "@/lib/stats";
 import { Input, Select, YearScale } from "@/components/ui/primitives";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
+import { EXCEL_NUM_FMT, EXCEL_PERCENT_FMT, EXCEL_SIGNED_PERCENT_FMT } from "@/lib/excel";
 import { cn, trim } from "@/lib/utils";
 
 const PER_PAGE = 25;
@@ -84,6 +85,7 @@ export default function JadvalPage() {
         header: "Qıymet",
         align: "right",
         sortValue: (p) => p.value,
+        numFmt: EXCEL_NUM_FMT,
         render: (p) => (
           <span className="tnum">
             {trim(p.value)} <span className="text-[11px] text-ink-3">{unit}</span>
@@ -95,6 +97,7 @@ export default function JadvalPage() {
         header: "Ósiw, %",
         align: "right",
         sortValue: (p) => p.yoy,
+        numFmt: EXCEL_SIGNED_PERCENT_FMT,
         render: (p) => cellNum(p.yoy, (n) => `${n > 0 ? "+" : ""}${trim(n)}%`),
       },
     ];
@@ -105,6 +108,7 @@ export default function JadvalPage() {
           header: "Reja",
           align: "right",
           sortValue: (p) => p.plan,
+          numFmt: EXCEL_NUM_FMT,
           render: (p) => cellNum(p.plan, (n) => `${trim(n)} ${unit}`),
         },
         {
@@ -142,6 +146,7 @@ export default function JadvalPage() {
         header: "Qıymet",
         align: "right",
         sortValue: (d) => d.value,
+        numFmt: EXCEL_NUM_FMT,
         render: (d) => cellNum(d.value, (n) => `${trim(n)} ${unit}`),
       },
       {
@@ -149,6 +154,7 @@ export default function JadvalPage() {
         header: "Úlesi, %",
         align: "right",
         sortValue: (d) => d.share,
+        numFmt: EXCEL_PERCENT_FMT,
         render: (d) => cellNum(d.share, (n) => `${trim(n)}%`),
       },
       {
@@ -156,6 +162,7 @@ export default function JadvalPage() {
         header: "Ósiw, %",
         align: "right",
         sortValue: (d) => d.yoy,
+        numFmt: EXCEL_SIGNED_PERCENT_FMT,
         render: (d) => cellNum(d.yoy, (n) => `${n > 0 ? "+" : ""}${trim(n)}%`),
       },
       {
@@ -173,6 +180,7 @@ export default function JadvalPage() {
           header: "Reja",
           align: "right",
           sortValue: (d) => d.plan,
+          numFmt: EXCEL_NUM_FMT,
           render: (d) => cellNum(d.plan, (n) => `${trim(n)} ${unit}`),
         },
         {

@@ -8,6 +8,7 @@ import { Segmented, YearScale } from "@/components/ui/primitives";
 import { HeroFigure, StatTile } from "@/components/charts/StatTile";
 import { ChartRenderer } from "@/components/charts/ChartRenderer";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
+import { EXCEL_NUM_FMT, EXCEL_PERCENT_FMT, EXCEL_SIGNED_PERCENT_FMT } from "@/lib/excel";
 import type { ChartSpec } from "@/lib/types";
 import { compact, trim } from "@/lib/utils";
 
@@ -128,6 +129,7 @@ export default function DashboardPage() {
         header: "Kólemi",
         align: "right",
         sortValue: (r) => r.value,
+        numFmt: EXCEL_NUM_FMT,
         render: (r) => (
           <span className="tnum">
             {compact(r.value)} <span className="text-[11px] text-ink-3">{r.unit}</span>
@@ -139,6 +141,7 @@ export default function DashboardPage() {
         header: "Ósiw, %",
         align: "right",
         sortValue: (r) => r.yoy,
+        numFmt: EXCEL_SIGNED_PERCENT_FMT,
         render: (r) => cellNum(r.yoy, (n) => `${n > 0 ? "+" : ""}${trim(n)}%`),
       },
     ];
@@ -149,6 +152,7 @@ export default function DashboardPage() {
           header: "Úlesi, %",
           align: "right",
           sortValue: (r) => r.share,
+          numFmt: EXCEL_PERCENT_FMT,
           render: (r) => cellNum(r.share, (n) => `${trim(n)}%`),
         },
         {
