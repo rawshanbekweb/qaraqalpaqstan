@@ -43,6 +43,13 @@ export interface AdminSummary {
   modules: SummaryModule[];
 }
 
+export interface TouchedIndicator {
+  id: number;
+  name: string;
+  /** Bul júklew menen jańadan jaratıldımı, yamasa bar bolǵan jańalandımı */
+  yangi: boolean;
+}
+
 export interface UploadResult {
   file: string;
   category: string;
@@ -52,6 +59,7 @@ export interface UploadResult {
   otkazib_yuborilgan: number;
   sebep_belgisiz_rayon: number;
   sebep_qaytalanma: number;
+  korsetkishler: TouchedIndicator[];
 }
 
 async function readError(res: Response): Promise<string> {

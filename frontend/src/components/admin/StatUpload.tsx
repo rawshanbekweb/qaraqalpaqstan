@@ -178,6 +178,34 @@ export function StatUpload({
                 )}
               </div>
             )}
+
+            {result.korsetkishler.length > 0 && (
+              <div className="mt-3 border-t border-hairline/60 pt-3">
+                <div className="mb-1.5 text-[12px] font-semibold text-ink-3 uppercase tracking-wide">
+                  Jańalanǵan kórsetkishler ({result.korsetkishler.length})
+                </div>
+                <div className="thin-scroll max-h-[180px] space-y-1 overflow-y-auto">
+                  {result.korsetkishler.map((k) => (
+                    <div
+                      key={k.id}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1 text-[12.5px] hover:bg-raised/40"
+                    >
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                          k.yangi ? "bg-cyan/15 text-cyan" : "bg-abyss/70 text-ink-3",
+                        )}
+                      >
+                        {k.yangi ? "jańa" : "jańalandı"}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-ink-2" title={k.name}>
+                        {k.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -16,6 +16,7 @@ import sys
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -116,7 +117,7 @@ def core_module(name: str) -> str | None:
 
 def load_records(
     records: list[Record], db: Session, *, replace_all: bool = True
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """
     Yozuvlar oqimini bazaga yozadi.
 
@@ -134,6 +135,7 @@ def load_records(
             "otkazib_yuborilgan": 0,
             "sebep_belgisiz_rayon": 0,
             "sebep_qaytalanma": 0,
+            "korsetkishler": [],
         }
 
     known_districts = {d.id for d in db.scalars(select(District))}
@@ -155,9 +157,13 @@ def load_records(
         grouped[record_slug(r)].append(r)
 
     indicator_ids: dict[str, int] = {}
+    #: Admin panelde "nima o'zgardi" ko'rsatish ushın — usı júklew tiygen
+    #: hár bir ko'rsatkish, jańa/eski belgisi menen.
+    touched_indicators: list[dict] = []
     for slug, rows in grouped.items():
         first = rows[0]
         ind = db.scalar(select(StatIndicator).where(StatIndicator.slug == slug))
+        is_new = ind is None
         if ind is None:
             ind = StatIndicator(slug=slug, category_id=CATEGORIES[first.category][0])
             db.add(ind)
@@ -169,6 +175,9 @@ def load_records(
         ind.source = first.source[:200]
         db.flush()
         indicator_ids[slug] = ind.id
+        touched_indicators.append({"id": ind.id, "name": ind.name_kaa, "yangi": is_new})
+
+    touched_indicators.sort(key=lambda t: t["name"])
 
     # ── O'lchovlar: eski qiymatlarni tozalab, yangidan yozamiz ──
     if replace_all:
@@ -226,6 +235,7 @@ def load_records(
         "sebep_belgisiz_rayon": skipped_unknown_district,
         "sebep_qaytalanma": skipped_duplicate,
         "eskirgen": orphans,
+        "korsetkishler": touched_indicators,
     }
 
 
@@ -237,7 +247,7 @@ def keep_known(records) -> list[Record]:
     ]
 
 
-def load(data_root: Path, db: Session) -> dict[str, int]:
+def load(data_root: Path, db: Session) -> dict[str, Any]:
     records = keep_known(parse_tree(data_root))
     if not records:
         raise SystemExit(f"'{data_root}' ichidan yozuv topilmadi")
@@ -255,6 +265,8 @@ def main() -> None:
 
     print("Yuklandi.")
     for k, v in stats.items():
+        if k == "korsetkishler":
+            continue  # to'liq qayta yuklashda mıńlaǵan qatar — CLI'da kerek emes
         print(f"  {k:22} {v:,}" if isinstance(v, int) else f"  {k:22} {v}")
 
 

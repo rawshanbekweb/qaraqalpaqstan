@@ -384,6 +384,8 @@ def main() -> None:
 
     print("Operativ KPI júklendi.")
     for k, v in stats.items():
+        if k == "korsetkishler":
+            continue
         print(f"  {k:22} {v}")
 
 
