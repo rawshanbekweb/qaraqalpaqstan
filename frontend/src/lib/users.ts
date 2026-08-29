@@ -23,12 +23,19 @@ export interface AdminUser {
   created_at: string;
 }
 
-export async function listUsers(): Promise<AdminUser[]> {
-  const res = await fetch(`${BASE}/api/users`, {
-    headers: authHeaders(),
+/** `/api/users/*` ushın ortaq soraw: headers/timeout/qátelik islew bir jerde */
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${BASE}/api/users${path}`, {
+    ...init,
+    headers: { ...authHeaders(), ...init?.headers },
     signal: AbortSignal.timeout(20_000),
   });
-  if (!res.ok) throw new Error(await readError(res));
+  if (!res.ok && res.status !== 204) throw new Error(await readError(res));
+  return res;
+}
+
+export async function listUsers(): Promise<AdminUser[]> {
+  const res = await apiFetch("");
   return (await res.json()) as AdminUser[];
 }
 
@@ -38,13 +45,11 @@ export async function createUser(input: {
   password: string;
   role: UserRole;
 }): Promise<AdminUser> {
-  const res = await fetch(`${BASE}/api/users`, {
+  const res = await apiFetch("", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
-    signal: AbortSignal.timeout(20_000),
   });
-  if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as AdminUser;
 }
 
@@ -52,21 +57,14 @@ export async function updateUser(
   id: number,
   patch: { full_name?: string; role?: UserRole; password?: string },
 ): Promise<AdminUser> {
-  const res = await fetch(`${BASE}/api/users/${id}`, {
+  const res = await apiFetch(`/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
-    signal: AbortSignal.timeout(20_000),
   });
-  if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as AdminUser;
 }
 
 export async function deleteUser(id: number): Promise<void> {
-  const res = await fetch(`${BASE}/api/users/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok && res.status !== 204) throw new Error(await readError(res));
+  await apiFetch(`/${id}`, { method: "DELETE" });
 }

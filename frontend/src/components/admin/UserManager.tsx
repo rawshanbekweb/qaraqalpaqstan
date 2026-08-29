@@ -47,6 +47,7 @@ export function UserManager() {
     try {
       const updated = await updateUser(u.id, { role });
       setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rol ózgermedi");
     }
@@ -56,6 +57,7 @@ export function UserManager() {
     try {
       await deleteUser(u.id);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Óshirilmedi");
     }

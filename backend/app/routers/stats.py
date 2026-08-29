@@ -7,6 +7,7 @@ dan oziqlanadi — 1084 ko'rsatkich, 24 199 o'lchov, 2010–2026 yillar.
 """
 
 import io
+import re
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -226,8 +227,14 @@ def bulk_update_indicators(payload: IndicatorBulkPatch, db: Session = Depends(ge
         raise HTTPException(400, f"Belgisiz taraw: {module}")
 
     updated, skipped = 0, 0
+    found = {
+        ind.id: ind
+        for ind in db.scalars(
+            select(StatIndicator).where(StatIndicator.id.in_(payload.ids))
+        )
+    }
     for indicator_id in payload.ids:
-        ind = db.get(StatIndicator, indicator_id)
+        ind = found.get(indicator_id)
         # Rayon kesimisiz ko'rsatkichke tayanch soha biriktirilmeydi —
         # jalǵız-jalǵız PATCH'tegi tekseriwdiń ózi, tek jańlısı ótkerip
         # jiberiledi, butın ámel toqtamaydı
@@ -361,6 +368,8 @@ def export_data(
         .order_by(StatCategory.sort, StatIndicator.name_kaa, StatObservation.year)
     )
     if category_id:
+        if not db.scalar(select(StatCategory.id).where(StatCategory.id == category_id)):
+            raise HTTPException(400, f"Belgisiz bólim: {category_id}")
         stmt = stmt.where(StatIndicator.category_id == category_id)
 
     rows = db.execute(stmt).all()
@@ -375,7 +384,9 @@ def export_data(
     media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     buf.seek(0)
 
-    filename = f"statistika-{category_id or 'barlik'}.xlsx"
+    # Content-Disposition sarlawhasın buzbaw ushın — tek qáwipsiz belgiler
+    safe_id = re.sub(r"[^\w-]", "_", category_id) if category_id else "barlik"
+    filename = f"statistika-{safe_id}.xlsx"
     return StreamingResponse(
         buf,
         media_type=media,

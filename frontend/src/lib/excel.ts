@@ -12,10 +12,13 @@ export function downloadExcel<T>(
   columns: ExcelColumn<T>[],
   rows: T[],
 ): void {
-  const data = rows.map((row) =>
-    Object.fromEntries(columns.map((c) => [c.header, c.value(row) ?? ""])),
-  );
-  const sheet = XLSX.utils.json_to_sheet(data, { header: columns.map((c) => c.header) });
+  // Positsiya boyınsha (baǵana atı emes) — eki baǵananıń atı sáykes kelse de
+  // dereklik joǵalmaydı
+  const aoa = [
+    columns.map((c) => c.header),
+    ...rows.map((row) => columns.map((c) => c.value(row) ?? "")),
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, "Maǵlıwmat");
   XLSX.writeFile(book, filename);

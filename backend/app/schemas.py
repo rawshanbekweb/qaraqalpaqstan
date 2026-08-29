@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 StatusId = Literal["completed", "in_progress", "at_risk", "critical"]
 Horizon = Literal["short", "mid", "long"]
@@ -170,4 +170,11 @@ class UserUpdate(BaseModel):
     full_name: str | None = None
     role: Literal["admin", "viewer"] | None = None
     #: Bos yamasa jiberilmegen bolsa parol ózgermeydi
-    password: str | None = Field(default=None, min_length=6, max_length=72)
+    password: str | None = Field(default=None, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def _password_len(cls, v: str | None) -> str | None:
+        if v and len(v) < 6:
+            raise ValueError("Parol keminde 6 belgi bolıwı kerek")
+        return v

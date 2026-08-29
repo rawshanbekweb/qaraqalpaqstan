@@ -7,7 +7,7 @@ jaratıla alatuǵın edi. Bul router admin panelge hisap qosıw/ózgertiw/
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -85,10 +85,13 @@ def delete_user(
     if user.id == me.id:
         raise HTTPException(400, "Óz hesabıńızdı ózińiz óshire almaysız")
     if user.role == "admin":
-        admin_count = db.scalar(
-            select(func.count()).select_from(User).where(User.role == "admin")
-        )
-        if admin_count is not None and admin_count <= 1:
+        # `with_for_update` — admin qatarların qulıplaydı, sonlıqtan eki
+        # bir waqıtta kelgen óshiriw sorawı bir-birin gúzetip, sanaǵın
+        # eski mánis penen esaplap ekewi de ótip ketpeydi (TOCTOU)
+        admin_ids = db.scalars(
+            select(User.id).where(User.role == "admin").with_for_update()
+        ).all()
+        if len(admin_ids) <= 1:
             raise HTTPException(400, "Aqırǵı administratordı óshirip bolmaydı")
 
     db.delete(user)
