@@ -17,11 +17,13 @@ import { trim } from "@/lib/utils";
 import { AuroraBackground } from "@/components/ui/AuroraBackground";
 import { AdminTopBar } from "@/components/layout/TopBar";
 import { Panel, Segmented } from "@/components/ui/primitives";
+import { DataExport } from "@/components/admin/DataExport";
 import { IndicatorBrowser } from "@/components/admin/IndicatorBrowser";
 import { StatUpload } from "@/components/admin/StatUpload";
 import { TaskBoard } from "@/components/admin/TaskBoard";
+import { UserManager } from "@/components/admin/UserManager";
 
-type Tab = "state" | "upload" | "indicators" | "tasks";
+type Tab = "state" | "upload" | "indicators" | "users" | "tasks";
 
 /**
  * Admin panel.
@@ -119,6 +121,7 @@ export default function AdminPage() {
                   { value: "state", label: "Baza halatı" },
                   { value: "upload", label: "Excel júklew" },
                   { value: "indicators", label: "Kórsetkishler" },
+                  { value: "users", label: "Paydalanıwshılar" },
                   { value: "tasks", label: "Tapsırmalar" },
                 ]}
               />
@@ -158,6 +161,8 @@ export default function AdminPage() {
                     />
                   )}
 
+                  {tab === "users" && <UserManager />}
+
                   {tab === "tasks" && <TaskBoard />}
                 </motion.div>
               </AnimatePresence>
@@ -175,9 +180,21 @@ function BaseState({ summary }: { summary: AdminSummary | null }) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-      <div>
-        <div className="mb-2 text-[14px] font-semibold text-ink">Bólimler boyınsha</div>
+    <div className="space-y-4">
+      <DataExport
+        categories={summary.categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          name_uz: c.name,
+          color: c.color,
+          sort: 0,
+          indicators: c.indicators,
+        }))}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <div>
+          <div className="mb-2 text-[14px] font-semibold text-ink">Bólimler boyınsha</div>
         <div className="thin-scroll overflow-x-auto rounded-2xl ring-1 ring-edge/50">
           <table className="w-full min-w-[420px] border-collapse text-[13px]">
             <thead className="bg-abyss/70">
@@ -236,6 +253,7 @@ function BaseState({ summary }: { summary: AdminSummary | null }) {
           ólshemi kóbirek bolǵanı. Basqasın qoyıw ushın «Kórsetkishler» bóliminde házirgisiniń
           biriktiriwin úziń.
         </p>
+      </div>
       </div>
     </div>
   );

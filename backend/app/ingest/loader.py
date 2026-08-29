@@ -116,7 +116,11 @@ def core_module(name: str) -> str | None:
 
 
 def load_records(
-    records: list[Record], db: Session, *, replace_all: bool = True
+    records: list[Record],
+    db: Session,
+    *,
+    replace_all: bool = True,
+    commit: bool = True,
 ) -> dict[str, Any]:
     """
     Yozuvlar oqimini bazaga yozadi.
@@ -126,6 +130,12 @@ def load_records(
     bo'ladi va faqat SHU fayl tegib o'tgan ko'rsatkichlarning o'lchovlari
     almashtiriladi — aks holda bitta fayl yuklash butun bazani o'chirib
     yuborardi.
+
+    `commit=False` — natijalar hisoblanadi, lekin tranzaksiya
+    tastıyıqlanbaydı (`db.flush()` jetkilikli). Shaqırıwshı tárep
+    keyin `db.rollback()` shaqırıwı SHÁRT — admin júklewdiń aldınnan
+    kóriw rejimi (`/upload/preview`) usılay isleydi: nátiyje bazaǵa
+    haqıyqıy jazılǵandaǵıday esaplanadı, biraq iz qaldırmaydı.
     """
     if not records:
         return {
@@ -226,7 +236,10 @@ def load_records(
             ~StatIndicator.observations.any()
         ).delete(synchronize_session=False)
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return {
         "kategoriya": len({r.category for r in records}),
         "korsetkish": len(indicator_ids),

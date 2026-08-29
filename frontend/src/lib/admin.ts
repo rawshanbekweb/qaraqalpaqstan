@@ -53,6 +53,8 @@ export interface TouchedIndicator {
 export interface UploadResult {
   file: string;
   category: string;
+  /** true bo'lsa — bu faqat oldindan ko'rish, baza o'zgarmagan */
+  preview: boolean;
   kategoriya: number;
   korsetkish: number;
   olshov: number;
@@ -62,7 +64,7 @@ export interface UploadResult {
   korsetkishler: TouchedIndicator[];
 }
 
-async function readError(res: Response): Promise<string> {
+export async function readError(res: Response): Promise<string> {
   try {
     const body = (await res.json()) as { detail?: unknown };
     if (typeof body.detail === "string") return body.detail;
@@ -112,6 +114,70 @@ export async function uploadWorkbook(file: File, category: string): Promise<Uplo
   });
   if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as UploadResult;
+}
+
+/**
+ * Faylni bazaǵa jazbastan sınap kóredi — nátiyje `uploadWorkbook` menen
+ * bir túrde, biraq eshqanday ózgeris qalmaydı. Admin nadurıs bólim
+ * tańlaǵanın tastıyıqlawdan aldın kóre aladı.
+ */
+export async function previewWorkbook(file: File, category: string): Promise<UploadResult> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("category", category);
+
+  const res = await fetch(`${BASE}/api/stats/upload/preview`, {
+    method: "POST",
+    headers: authHeaders(),
+    body,
+    signal: AbortSignal.timeout(300_000),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as UploadResult;
+}
+
+/** Bir nechte ko'rsatkishti birdey tayanch sohaǵa biriktiredi. */
+export async function bulkSetIndicatorModule(
+  ids: number[],
+  module: string | null,
+): Promise<{ updated: number; skipped: number }> {
+  const res = await fetch(`${BASE}/api/stats/indicators/bulk`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ ids, module: module ?? "" }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as { updated: number; skipped: number };
+}
+
+/** Bazadagi statistikani Excel/CSV qilib yuklab oladi (klient brauzeriga). */
+export async function downloadExport(params: {
+  category_id?: string;
+  fmt?: "xlsx" | "csv";
+}): Promise<void> {
+  const qs = new URLSearchParams();
+  if (params.category_id) qs.set("category_id", params.category_id);
+  qs.set("fmt", params.fmt ?? "xlsx");
+
+  const res = await fetch(`${BASE}/api/stats/export?${qs.toString()}`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const filename = /filename="?([^"]+)"?/.exec(disposition)?.[1] ?? `statistika.${params.fmt ?? "xlsx"}`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Ko'rsatkichlar ma'lumotnomasi — o'qish uchun, keshdan foydalanadi. */

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import SessionLocal, ensure_schema
-from app.routers import ai, auth, data, stats
+from app.routers import ai, auth, data, stats, users
 from app.seed import seed_reference, seed_users
 
 logging.basicConfig(level=logging.INFO)
@@ -39,12 +39,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Excel/CSV eksport faylı nomi usı sarlawhada keledi — brauzer ony
+    # ashıq qoyılmasa aralıq-domen sorawda oqıy almaydı
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(auth.router)
 app.include_router(data.router)
 app.include_router(stats.router)
 app.include_router(ai.router)
+app.include_router(users.router)
 
 
 @app.get("/api/health")

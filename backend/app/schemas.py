@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -142,3 +142,32 @@ class TokenResponse(BaseModel):
     username: str
     full_name: str
     role: str
+
+
+# ── Paydalanıwshılar (admin) ────────────────────────────────────────
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    full_name: str
+    role: str
+    created_at: datetime
+
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=2, max_length=60)
+    full_name: str = ""
+    password: str = Field(min_length=6, max_length=72)
+    role: Literal["admin", "viewer"] = "viewer"
+
+
+class UserUpdate(BaseModel):
+    """Qisman jańalaw — tek jiberilgen maydanlar ózgeredi."""
+
+    full_name: str | None = None
+    role: Literal["admin", "viewer"] | None = None
+    #: Bos yamasa jiberilmegen bolsa parol ózgermeydi
+    password: str | None = Field(default=None, min_length=6, max_length=72)

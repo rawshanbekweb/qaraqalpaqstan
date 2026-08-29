@@ -1,12 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
-import { AlertTriangle, Link2, Link2Off, Loader2, Search } from "lucide-react";
+import { AlertTriangle, Link2, Link2Off, Loader2, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { setIndicatorModule, type SummaryModule } from "@/lib/admin";
+import { bulkSetIndicatorModule, setIndicatorModule, type SummaryModule } from "@/lib/admin";
 import { clearStatsCache, useStats, type IndicatorBrief, type StatsCategory } from "@/lib/stats";
 import { cn } from "@/lib/utils";
-import { Input, Select } from "@/components/ui/primitives";
+import { Button, Input, Select } from "@/components/ui/primitives";
 
 const PER_PAGE = 25;
 
@@ -34,7 +34,11 @@ export function IndicatorBrowser({
   const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkModule, setBulkModule] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Har harfda so'rov ketmasin. Sahifa raqami ham shu yerda nolga
   // qaytadi — yangi qidiruvda 5-sahifada turib qolish mumkin emas.
@@ -42,6 +46,8 @@ export function IndicatorBrowser({
     const t = setTimeout(() => {
       setDebounced(q.trim());
       setPage(0);
+      // Filtr ózgerdi — tańlanǵanlar endi ekranda joq bolıwı múmkin
+      setSelected(new Set());
     }, 300);
     return () => clearTimeout(t);
   }, [q]);
@@ -66,6 +72,7 @@ export function IndicatorBrowser({
 
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const pageItems = data?.items ?? [];
 
   async function toggle(item: IndicatorBrief, module: string | null) {
     setBusyId(item.id);
@@ -79,6 +86,50 @@ export function IndicatorBrowser({
       setError(e instanceof Error ? e.message : "Ózgeris saqlanbadı");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allOnPageSelected =
+    pageItems.length > 0 && pageItems.every((i) => selected.has(i.id));
+
+  function toggleAllOnPage() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) pageItems.forEach((i) => next.delete(i.id));
+      else pageItems.forEach((i) => next.add(i.id));
+      return next;
+    });
+  }
+
+  async function applyBulk() {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const res = await bulkSetIndicatorModule(Array.from(selected), bulkModule || null);
+      clearStatsCache();
+      setVersion((v) => v + 1);
+      onChanged();
+      setSelected(new Set());
+      if (res.skipped > 0) {
+        setNote(`${res.updated} kórsetkish biriktirildi, ${res.skipped} ótkerip jiberildi — rayon kesimi joq`);
+      } else {
+        setNote(`${res.updated} kórsetkish biriktirildi`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ózgeris saqlanbadı");
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -103,6 +154,7 @@ export function IndicatorBrowser({
           onChange={(e) => {
             setCategoryId(e.target.value);
             setPage(0);
+            setSelected(new Set());
           }}
           className="w-auto min-w-[180px]"
         >
@@ -121,6 +173,7 @@ export function IndicatorBrowser({
             onChange={(e) => {
               setDistrictsOnly(e.target.checked);
               setPage(0);
+              setSelected(new Set());
             }}
             className="size-3.5 accent-cyan"
           />
@@ -135,10 +188,57 @@ export function IndicatorBrowser({
         </div>
       )}
 
+      {note && !error && (
+        <div className="flex items-start justify-between gap-2 rounded-xl bg-mint/10 px-3 py-2.5 ring-1 ring-mint/25">
+          <span className="text-[13px] text-mint">{note}</span>
+          <button onClick={() => setNote(null)} className="text-ink-3 hover:text-ink">
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-cyan/8 px-3.5 py-2.5 ring-1 ring-cyan/25">
+          <span className="text-[13px] font-medium text-ink">
+            {selected.size} kórsetkish tańlandı
+          </span>
+          <div className="flex-1" />
+          <Select
+            value={bulkModule}
+            onChange={(e) => setBulkModule(e.target.value)}
+            className="w-auto min-w-[200px]"
+            disabled={bulkBusy}
+          >
+            <option value="">— biriktiriwdi uziw —</option>
+            {modules.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </Select>
+          <Button type="button" onClick={applyBulk} disabled={bulkBusy}>
+            {bulkBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+            Qollanıw
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setSelected(new Set())} disabled={bulkBusy}>
+            Biykarlaw
+          </Button>
+        </div>
+      )}
+
       <div className="thin-scroll overflow-x-auto rounded-2xl ring-1 ring-edge/50">
-        <table className="w-full min-w-[860px] border-collapse text-[13px]">
+        <table className="w-full min-w-[900px] border-collapse text-[13px]">
           <thead className="bg-abyss/70">
             <tr>
+              <th className="w-10 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={toggleAllOnPage}
+                  className="size-3.5 accent-cyan"
+                  aria-label="Betteginiń bárin tańlaw"
+                />
+              </th>
               {["Kórsetkish", "Ólshem", "Rayon kesimi", "Tayanch taraw", ""].map((h) => (
                 <th
                   key={h}
@@ -156,8 +256,20 @@ export function IndicatorBrowser({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: Math.min(i * 0.012, 0.25) }}
-                className="border-t border-hairline/50 transition hover:bg-raised/35"
+                className={cn(
+                  "border-t border-hairline/50 transition hover:bg-raised/35",
+                  selected.has(item.id) && "bg-cyan/6",
+                )}
               >
+                <td className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(item.id)}
+                    onChange={() => toggleSelected(item.id)}
+                    className="size-3.5 accent-cyan"
+                    aria-label={`${item.name} tańlaw`}
+                  />
+                </td>
                 <td className="max-w-[380px] px-3 py-2">
                   <div className="truncate text-ink" title={item.name}>
                     {item.name}
@@ -208,7 +320,7 @@ export function IndicatorBrowser({
 
             {!loading && (data?.items.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-ink-3">
+                <td colSpan={6} className="px-3 py-6 text-center text-ink-3">
                   Hesh nárse tabılmadı
                 </td>
               </tr>

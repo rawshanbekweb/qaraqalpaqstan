@@ -1,9 +1,17 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  FileSpreadsheet,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { uploadWorkbook, type UploadResult } from "@/lib/admin";
+import { previewWorkbook, uploadWorkbook, type UploadResult } from "@/lib/admin";
 import { clearStatsCache } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { Button, Field, Select } from "@/components/ui/primitives";
@@ -15,6 +23,11 @@ import { Button, Field, Select } from "@/components/ui/primitives";
  * (sarlavha qatori 10-qatorgacha bo'lishi mumkin, bir varaqda ustma-ust
  * jadvallar, ierarxik qatorlar), buni serverdagi parser hal qiladi.
  * Ikkinchi, soddalashtirilgan nusxa yozilsa natijalar farq qilardi.
+ *
+ * Fayl to'g'ridan-to'g'ri bazaga yozilmaydi: avval «Ko'rish» bosiladi —
+ * server xuddi shu parser bilan sinab ko'radi, natijani qaytaradi, lekin
+ * hech narsa saqlamaydi. Admin nadurıs bólim tańlaǵanın SHUNDA kóredi,
+ * bazaǵa tiymey turıp. Tastıyıqlasa ǵana haqıyqıy jazıw júz beredi.
  */
 export function StatUpload({
   sourceDirs,
@@ -25,7 +38,9 @@ export function StatUpload({
 }) {
   const [category, setCategory] = useState(sourceDirs[0] ?? "");
   const [file, setFile] = useState<File | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<UploadResult | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -34,9 +49,29 @@ export function StatUpload({
   const pick = useCallback((f: File | undefined) => {
     if (!f) return;
     setFile(f);
+    setPreview(null);
     setResult(null);
     setError(null);
   }, []);
+
+  function changeCategory(next: string) {
+    setCategory(next);
+    // Aldınǵı kóriw eski bólim ushın edi — jańası menen sáykes emes
+    setPreview(null);
+  }
+
+  async function runPreview() {
+    if (!file || !category) return;
+    setPreviewing(true);
+    setError(null);
+    try {
+      setPreview(await previewWorkbook(file, category));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kóriw ámelge aspadı");
+    } finally {
+      setPreviewing(false);
+    }
+  }
 
   async function send() {
     if (!file || !category) return;
@@ -47,6 +82,7 @@ export function StatUpload({
       // Yuklashdan keyin panel eski javoblarni ko'rsatmasin
       clearStatsCache();
       setResult(res);
+      setPreview(null);
       setFile(null);
       onDone();
     } catch (e) {
@@ -62,7 +98,7 @@ export function StatUpload({
         label="Bólim"
         hint="Fayl qaysı bólimge tiyisli ekeni atınan bilinbeydi — ashıq saylanadı"
       >
-        <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+        <Select value={category} onChange={(e) => changeCategory(e.target.value)}>
           {sourceDirs.map((d) => (
             <option key={d} value={d}>
               {d}
@@ -115,10 +151,12 @@ export function StatUpload({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={send} disabled={!file || busy}>
-          {busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-          {busy ? "Júklenbekte…" : "Bazaǵa júklew"}
-        </Button>
+        {!preview && (
+          <Button type="button" onClick={runPreview} disabled={!file || previewing}>
+            {previewing ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
+            {previewing ? "Tekserilbekte…" : "Ko'riw"}
+          </Button>
+        )}
         <span className="text-[12.5px] text-ink-3">
           Tek ǵana usı fayl tiygen kórsetkishler jańalanadı
         </span>
@@ -134,6 +172,31 @@ export function StatUpload({
           >
             <AlertTriangle size={15} className="mt-0.5 shrink-0 text-crimson" />
             <span className="text-[13px] leading-relaxed text-coral">{error}</span>
+          </motion.div>
+        )}
+
+        {preview && (
+          <motion.div
+            key={`preview-${preview.file}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="rounded-2xl bg-abyss/60 p-3.5 ring-1 ring-amber/40"
+          >
+            <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber/10 px-3 py-2 text-[12.5px] font-medium text-amber ring-1 ring-amber/25">
+              <Eye size={14} className="shrink-0" />
+              Bul tek ALDINNAN KÓRIW — házirshe bazaǵa hesh nárse jazılmadı
+            </div>
+            <ResultBody data={preview} />
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hairline/60 pt-3">
+              <Button type="button" onClick={send} disabled={busy}>
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                {busy ? "Júklenbekte…" : "Tastıyıqlaw hám bazaǵa jazıw"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setPreview(null)} disabled={busy}>
+                Biykarlaw
+              </Button>
+            </div>
           </motion.div>
         )}
 
@@ -157,59 +220,64 @@ export function StatUpload({
                 <X size={14} />
               </button>
             </div>
-
-            <div className="grid grid-cols-3 gap-2.5">
-              <Tile label="Kórsetkish" value={result.korsetkish} tone="mint" />
-              <Tile label="Ólshem" value={result.olshov} tone="mint" />
-              <Tile
-                label="Ótkerip jiberildi"
-                value={result.otkazib_yuborilgan}
-                tone={result.otkazib_yuborilgan ? "amber" : "flat"}
-              />
-            </div>
-
-            {result.otkazib_yuborilgan > 0 && (
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-3">
-                {result.sebep_belgisiz_rayon > 0 && (
-                  <span>{result.sebep_belgisiz_rayon} ta: belgisiz rayon</span>
-                )}
-                {result.sebep_qaytalanma > 0 && (
-                  <span>{result.sebep_qaytalanma} ta: qaytalanma</span>
-                )}
-              </div>
-            )}
-
-            {result.korsetkishler.length > 0 && (
-              <div className="mt-3 border-t border-hairline/60 pt-3">
-                <div className="mb-1.5 text-[12px] font-semibold text-ink-3 uppercase tracking-wide">
-                  Jańalanǵan kórsetkishler ({result.korsetkishler.length})
-                </div>
-                <div className="thin-scroll max-h-[180px] space-y-1 overflow-y-auto">
-                  {result.korsetkishler.map((k) => (
-                    <div
-                      key={k.id}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1 text-[12.5px] hover:bg-raised/40"
-                    >
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase",
-                          k.yangi ? "bg-cyan/15 text-cyan" : "bg-abyss/70 text-ink-3",
-                        )}
-                      >
-                        {k.yangi ? "jańa" : "jańalandı"}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-ink-2" title={k.name}>
-                        {k.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <ResultBody data={result} />
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function ResultBody({ data }: { data: UploadResult }) {
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-2.5">
+        <Tile label="Kórsetkish" value={data.korsetkish} tone="mint" />
+        <Tile label="Ólshem" value={data.olshov} tone="mint" />
+        <Tile
+          label="Ótkerip jiberildi"
+          value={data.otkazib_yuborilgan}
+          tone={data.otkazib_yuborilgan ? "amber" : "flat"}
+        />
+      </div>
+
+      {data.otkazib_yuborilgan > 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-3">
+          {data.sebep_belgisiz_rayon > 0 && (
+            <span>{data.sebep_belgisiz_rayon} ta: belgisiz rayon</span>
+          )}
+          {data.sebep_qaytalanma > 0 && <span>{data.sebep_qaytalanma} ta: qaytalanma</span>}
+        </div>
+      )}
+
+      {data.korsetkishler.length > 0 && (
+        <div className="mt-3 border-t border-hairline/60 pt-3">
+          <div className="mb-1.5 text-[12px] font-semibold text-ink-3 uppercase tracking-wide">
+            Jańalanǵan kórsetkishler ({data.korsetkishler.length})
+          </div>
+          <div className="thin-scroll max-h-[180px] space-y-1 overflow-y-auto">
+            {data.korsetkishler.map((k) => (
+              <div
+                key={k.id}
+                className="flex items-center gap-2 rounded-lg px-2 py-1 text-[12.5px] hover:bg-raised/40"
+              >
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                    k.yangi ? "bg-cyan/15 text-cyan" : "bg-abyss/70 text-ink-3",
+                  )}
+                >
+                  {k.yangi ? "jańa" : "jańalandı"}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-ink-2" title={k.name}>
+                  {k.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -6,15 +6,19 @@ admin paneli uchun qoladi. Bosh sahifa esa shu yerdagi `/api/stats/*`
 dan oziqlanadi — 1084 ko'rsatkich, 24 199 o'lchov, 2010–2026 yillar.
 """
 
+import io
+
+import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.ingest.excel import parse_bytes
+from app.ingest.excel import Record, parse_bytes
 from app.ingest.loader import CATEGORIES, keep_known, load_records
-from app.models import StatCategory, StatIndicator, StatObservation
+from app.models import District, StatCategory, StatIndicator, StatObservation
 from app.security import require_admin
 from app.services import stats as st
 
@@ -200,6 +204,43 @@ class IndicatorPatch(BaseModel):
     lower_is_better: bool | None = None
 
 
+class IndicatorBulkPatch(BaseModel):
+    """Bir nechte ko'rsatkichti birdey tayanch sohaǵa biriktiriw."""
+
+    ids: list[int]
+    module: str | None = None
+
+
+@router.patch("/indicators/bulk", dependencies=[Depends(require_admin)])
+def bulk_update_indicators(payload: IndicatorBulkPatch, db: Session = Depends(get_db)):
+    """
+    Bir nechew qatardı birden biriktiredi.
+
+    DIQQAT: bul marshrut `/indicators/{indicator_id}` den ALDIN turıwı
+    SHÁRT — Starlette jol salıstırıwdı registraciya tártibinde islaydi,
+    aks halda "bulk" sózi `indicator_id` retinde islenip, 422 qátelik
+    beredi.
+    """
+    module = (payload.module or "").strip() or None
+    if module is not None and module not in st.MODULE_META:
+        raise HTTPException(400, f"Belgisiz taraw: {module}")
+
+    updated, skipped = 0, 0
+    for indicator_id in payload.ids:
+        ind = db.get(StatIndicator, indicator_id)
+        # Rayon kesimisiz ko'rsatkichke tayanch soha biriktirilmeydi —
+        # jalǵız-jalǵız PATCH'tegi tekseriwdiń ózi, tek jańlısı ótkerip
+        # jiberiledi, butın ámel toqtamaydı
+        if ind is None or (module is not None and not ind.has_districts):
+            skipped += 1
+            continue
+        ind.module = module
+        updated += 1
+
+    db.commit()
+    return {"updated": updated, "skipped": skipped}
+
+
 @router.patch("/indicators/{indicator_id}", dependencies=[Depends(require_admin)])
 def update_indicator(
     indicator_id: int, payload: IndicatorPatch, db: Session = Depends(get_db)
@@ -226,19 +267,8 @@ def update_indicator(
     return st.indicator_detail(db, ind)
 
 
-@router.post("/upload", dependencies=[Depends(require_admin)])
-async def upload_workbook(
-    file: UploadFile = File(...),
-    category: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    """
-    Statistika Excel faylini bazaga yuklaydi.
-
-    Fayl qaysi bo'limga tegishli ekani nomidan bilinmaydi (manba
-    papkalarida turgan), shuning uchun `category` ochiq beriladi.
-    Yuklash faqat SHU fayl tegib o'tgan ko'rsatkichlarni yangilaydi.
-    """
+async def _parse_upload(file: UploadFile, category: str) -> list[Record]:
+    """Yuklangan faylni yozuvlar oqimiga aylantiradi — preview va haqiqiy yuklashda umumiy."""
     if category not in CATEGORIES:
         raise HTTPException(400, f"Belgisiz bólim: {category}")
     if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
@@ -257,6 +287,103 @@ async def upload_workbook(
             400,
             "Fayldan bir de jazıw alınbadı — dáwir atları bar sarlawha qatarı tabılmadı",
         )
+    return records
 
+
+@router.post("/upload/preview", dependencies=[Depends(require_admin)])
+async def upload_preview(
+    file: UploadFile = File(...),
+    category: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Fayldı bazaǵa jazbastan sınap kóredi.
+
+    Nátiyje `/upload` menen bir túrde — sonday kórsetkishler jańalanadı,
+    sonday sanlar shıǵadı — biraq tranzaksiya HÁMİSHE keri qaytarıladı
+    (`db.rollback()`), sonlıqtan baza tiimeydi. Admin nadurıs bólim
+    tańlaǵanın júklewden ALDIN kóredi.
+    """
+    records = await _parse_upload(file, category)
+    try:
+        stats = load_records(records, db, replace_all=False, commit=False)
+    finally:
+        db.rollback()
+    return {"file": file.filename, "category": category, "preview": True, **stats}
+
+
+@router.post("/upload", dependencies=[Depends(require_admin)])
+async def upload_workbook(
+    file: UploadFile = File(...),
+    category: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Statistika Excel faylini bazaga yuklaydi.
+
+    Fayl qaysi bo'limga tegishli ekani nomidan bilinmaydi (manba
+    papkalarida turgan), shuning uchun `category` ochiq beriladi.
+    Yuklash faqat SHU fayl tegib o'tgan ko'rsatkichlarni yangilaydi.
+    """
+    records = await _parse_upload(file, category)
     stats = load_records(records, db, replace_all=False)
-    return {"file": file.filename, "category": category, **stats}
+    return {"file": file.filename, "category": category, "preview": False, **stats}
+
+
+@router.get("/export", dependencies=[Depends(require_admin)])
+def export_data(
+    category_id: str | None = None,
+    fmt: str = Query(default="xlsx", pattern="^(xlsx|csv)$"),
+    db: Session = Depends(get_db),
+):
+    """
+    Bazadagi o'lchovlarni Excel yoki CSV qilib qaytaradi.
+
+    `category_id` berilmasa — butun baza. 24 mıńǵa jaqın qatar hátte
+    xlsx'te de tez jaratıladı, sonlıqtan fon jumısı kerek emes.
+    """
+    stmt = (
+        select(
+            StatCategory.name_kaa,
+            StatIndicator.name_kaa,
+            StatIndicator.unit,
+            District.name,
+            StatObservation.year,
+            StatObservation.period,
+            StatObservation.period_no,
+            StatObservation.value,
+            StatObservation.plan_value,
+            StatIndicator.source,
+        )
+        .select_from(StatObservation)
+        .join(StatIndicator, StatObservation.indicator_id == StatIndicator.id)
+        .join(StatCategory, StatIndicator.category_id == StatCategory.id)
+        .outerjoin(District, StatObservation.district_id == District.id)
+        .order_by(StatCategory.sort, StatIndicator.name_kaa, StatObservation.year)
+    )
+    if category_id:
+        stmt = stmt.where(StatIndicator.category_id == category_id)
+
+    rows = db.execute(stmt).all()
+    columns = [
+        "Bólim", "Kórsetkish", "Ólshem", "Rayon", "Jıl",
+        "Dáwir", "Dáwir nomeri", "Qıymet", "Reja", "Derek",
+    ]
+    df = pd.DataFrame(rows, columns=columns)
+
+    buf = io.BytesIO()
+    if fmt == "csv":
+        # BOM — Excel'de qaraqalpaq/kirill hárpleri buzılmay ashılıwı ushın
+        df.to_csv(buf, index=False, sep=";", encoding="utf-8-sig")
+        media = "text/csv"
+    else:
+        df.to_excel(buf, index=False, sheet_name="Statistika")
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    buf.seek(0)
+
+    filename = f"statistika-{category_id or 'barlik'}.{fmt}"
+    return StreamingResponse(
+        buf,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
