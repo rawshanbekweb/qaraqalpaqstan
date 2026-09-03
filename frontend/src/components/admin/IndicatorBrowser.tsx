@@ -52,7 +52,7 @@ export function IndicatorBrowser({
     return () => clearTimeout(t);
   }, [q]);
 
-  const { data, loading } = useStats<{
+  const { data, loading, error: fetchError } = useStats<{
     total: number;
     items: IndicatorBrief[];
   }>("/indicators", {
@@ -181,17 +181,19 @@ export function IndicatorBrowser({
         </label>
       </div>
 
-      {error && (
+      {(error || fetchError) && (
         <div className="flex items-start gap-2 rounded-xl bg-crimson/12 px-3 py-2.5 ring-1 ring-crimson/30">
           <AlertTriangle size={15} className="mt-0.5 shrink-0 text-crimson" />
-          <span className="text-[13px] text-coral">{error}</span>
+          <span className="text-[13px] text-coral">
+            {error || `Kórsetkishler dizimi júklenbedi: ${fetchError?.message}`}
+          </span>
         </div>
       )}
 
       {note && !error && (
         <div className="flex items-start justify-between gap-2 rounded-xl bg-mint/10 px-3 py-2.5 ring-1 ring-mint/25">
           <span className="text-[13px] text-mint">{note}</span>
-          <button onClick={() => setNote(null)} className="text-ink-3 hover:text-ink">
+          <button onClick={() => setNote(null)} aria-label="Jabıw" className="text-ink-3 hover:text-ink">
             <X size={13} />
           </button>
         </div>
@@ -321,7 +323,7 @@ export function IndicatorBrowser({
             {!loading && (data?.items.length ?? 0) === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-ink-3">
-                  Hesh nárse tabılmadı
+                  {fetchError ? "Maǵlıwmat júklenbedi" : "Hesh nárse tabılmadı"}
                 </td>
               </tr>
             )}

@@ -476,6 +476,7 @@ export function ChartRenderer({
               : "bg-abyss/50 text-ink-3 ring-edge/50 hover:text-ink-2",
           )}
           title={asTable ? "Grafik kórinisi" : "Keste kórinisi"}
+          aria-label={asTable ? "Grafik kórinisi" : "Keste kórinisi"}
           aria-pressed={asTable}
         >
           {asTable ? <TrendingUp size={14} /> : <Table2 size={14} />}

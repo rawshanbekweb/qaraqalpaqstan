@@ -137,14 +137,14 @@ export function HeroFigure({
       <div className="relative">
         <div className="text-[12.5px] tracking-wide text-ink-3 uppercase">{label}</div>
         <div className="mt-1.5 flex items-baseline gap-2">
-          <span className="text-[52px] leading-[0.95] font-semibold tracking-tight text-ink">
+          <span className="text-[38px] leading-[0.95] font-semibold tracking-tight text-ink sm:text-[52px]">
             {value === null ? (
               <span className="text-ink-3">—</span>
             ) : (
               <Counter value={value} digits={1} duration={1.4} />
             )}
           </span>
-          <span className="text-2xl font-medium text-ink-3">{suffix}</span>
+          <span className="text-lg font-medium text-ink-3 sm:text-2xl">{suffix}</span>
         </div>
         {caption ? <div className="mt-2 text-[13px] text-ink-2">{caption}</div> : null}
       </div>

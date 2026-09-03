@@ -223,6 +223,7 @@ function UserRow({
               disabled={busy}
               className="grid size-7 shrink-0 place-items-center rounded-md text-mint hover:bg-mint/10 disabled:opacity-50"
               title="Saqlaw"
+              aria-label="Saqlaw"
             >
               {busy ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
             </button>
@@ -233,6 +234,7 @@ function UserRow({
               }}
               className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 hover:text-coral"
               title="Biykarlaw"
+              aria-label="Biykarlaw"
             >
               <X size={13} />
             </button>
@@ -242,6 +244,7 @@ function UserRow({
             <button
               onClick={() => setChangingPassword(true)}
               title="Paroldı almastırıw"
+              aria-label="Paroldı almastırıw"
               className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition hover:text-cyan"
             >
               <KeyRound size={13} />
@@ -250,6 +253,7 @@ function UserRow({
               onClick={onRemove}
               disabled={isSelf}
               title={isSelf ? "Óz hesabıńızdı óshire almaysız" : "Óshiriw"}
+              aria-label={isSelf ? "Óz hesabıńızdı óshire almaysız" : "Óshiriw"}
               className={cn(
                 "grid size-7 shrink-0 place-items-center rounded-md transition",
                 isSelf ? "text-ink-3/40" : "text-ink-3 hover:text-coral",
