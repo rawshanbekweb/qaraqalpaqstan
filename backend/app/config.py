@@ -22,6 +22,14 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000,http://localhost:3100"
 
+    # `admin`/`rahbar` demo esapları ushın parol — berilmese `seed.py`
+    # (tek jańa bazada, esap ele joq bolǵanda) qátelesiwi qıyın kездейсоқ
+    # parol jaratadı hám ony bir márte log'ǵa jazadı. Belgili parol
+    # kerek bolsa (mısalı, bir team ushın umumıy demo júklew), usı arqalı
+    # ashıq beriledi.
+    admin_password: str | None = None
+    rahbar_password: str | None = None
+
     @field_validator("database_url")
     @classmethod
     def _use_psycopg_driver(cls, v: str) -> str:

@@ -12,15 +12,20 @@ Ishga tushirish:
 
 from __future__ import annotations
 
+import logging
+import secrets
 import sys
 from datetime import date
 
 from sqlalchemy import select, text
 
+from app.config import get_settings
 from app.database import SessionLocal, ensure_schema
 from app.models import District, EconomicTask, Module, User
 from app.security import hash_password
 from app.services.stats import MODULE_META
+
+logger = logging.getLogger(__name__)
 
 CURRENT_YEAR = 2026
 
@@ -147,14 +152,34 @@ def seed_tasks(db) -> int:
 
 
 def seed_users(db) -> int:
+    """
+    `admin` hám `rahbar` esapların jańa bazada bir mártege jaratadı.
+
+    Bar bolǵan esaplar tiymeydi (parolı ózgertilmeydi) — sonlıqtan bul
+    tek dáslepki bootstrap ushın. Parol `ADMIN_PASSWORD`/`RAHBAR_PASSWORD`
+    env ózgeriwshisinen alınadı; berilmese, hámmege belgili qattı kod
+    ornına kездейсоқ parol jaratıladı hám server logına JAZILADI (bir
+    márte, jaratılǵanda ǵana) — deployер ony sonnan kóshirip alıp, admin
+    panelinde ózgertiwi kerek.
+    """
+    settings = get_settings()
     demo = [
-        ("admin", "Bas administrator", "admin123", "admin"),
-        ("rahbar", "Basshılıq wákili", "rahbar123", "viewer"),
+        ("admin", "Bas administrator", settings.admin_password, "admin"),
+        ("rahbar", "Basshılıq wákili", settings.rahbar_password, "viewer"),
     ]
     created = 0
     for username, full_name, password, role in demo:
         if db.scalar(select(User).where(User.username == username)):
             continue
+        if not password:
+            password = secrets.token_urlsafe(9)
+            logger.warning(
+                "Jańa '%s' esabı jaratıldı. Kездейсоқ parol: %s — usını qásiyetli "
+                "jerge kóshirip alıń hám admin panelinde ózgertiń (yamasa keleси "
+                "safar ADMIN_PASSWORD/RAHBAR_PASSWORD env ózgeriwshisin belgileń).",
+                username,
+                password,
+            )
         db.add(
             User(
                 username=username,
