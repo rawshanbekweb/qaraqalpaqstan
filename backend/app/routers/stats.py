@@ -8,11 +8,12 @@ dan oziqlanadi — 1084 ko'rsatkich, 24 199 o'lchov, 2010–2026 yillar.
 
 import io
 import re
+from datetime import datetime
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -369,8 +370,12 @@ def export_data(
         .outerjoin(District, StatObservation.district_id == District.id)
         .order_by(StatCategory.sort, StatIndicator.name_kaa, StatObservation.year)
     )
+    category_name = None
     if category_id:
-        if not db.scalar(select(StatCategory.id).where(StatCategory.id == category_id)):
+        category_name = db.scalar(
+            select(StatCategory.name_kaa).where(StatCategory.id == category_id)
+        )
+        if category_name is None:
             raise HTTPException(400, f"Belgisiz bólim: {category_id}")
         stmt = stmt.where(StatIndicator.category_id == category_id)
 
@@ -380,30 +385,50 @@ def export_data(
         "Dáwir", "Dáwir nomeri", "Qıymet", "Reja", "Derek",
     ]
     df = pd.DataFrame(rows, columns=columns)
+    # Bos "Rayon" — respublika boyınsha jıyındı qıymet, hudud emes
+    df["Rayon"] = df["Rayon"].fillna("Respublika")
     number_columns = {"Qıymet", "Reja"}
+
+    #: 1-qatar — title, 2-qatar — sarlawha, 3-qatardan maǵlıwmat baslanadı
+    n_cols = len(columns)
+    header_row = 2
+    first_data_row = header_row + 1
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Statistika")
+        df.to_excel(writer, index=False, sheet_name="Statistika", startrow=header_row - 1)
         ws = writer.sheets["Statistika"]
+
+        # Title jolaǵı — bólim hám jaratılǵan waqıt
+        title = f"Qaraqalpaqstan statistikası — {category_name or 'barlıq bólimler'}"
+        subtitle = f"{len(df)} qatar · {datetime.now():%Y-%m-%d %H:%M}"
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
+        title_cell = ws.cell(row=1, column=1, value=f"{title} · {subtitle}")
+        title_cell.font = Font(bold=True, size=12, color="1F2937")
+        title_cell.alignment = Alignment(vertical="center")
+        ws.row_dimensions[1].height = 22
 
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill("solid", fgColor="2563EB")
-        for cell in ws[1]:
+        header_border = Border(bottom=Side(style="thin", color="1E3A8A"))
+        for cell in ws[header_row]:
             cell.font = header_font
             cell.fill = header_fill
+            cell.border = header_border
             cell.alignment = Alignment(vertical="center")
 
         for idx, name in enumerate(columns, start=1):
             col_letter = get_column_letter(idx)
             content_width = df[name].astype(str).map(len).max() if len(df) else 0
-            ws.column_dimensions[col_letter].width = min(max(len(name), content_width) + 2, 42)
+            width = max(len(name), content_width) + 2
+            ws.column_dimensions[col_letter].width = min(max(width, 8), 42)
             if name in number_columns:
-                for cell in ws[col_letter][1:]:
+                for cell in ws[col_letter][first_data_row - 1:]:
                     cell.number_format = "#,##0.###"
 
-        ws.freeze_panes = "A2"
-        ws.auto_filter.ref = ws.dimensions
+        ws.freeze_panes = f"A{first_data_row}"
+        ws.auto_filter.ref = f"A{header_row}:{get_column_letter(n_cols)}{ws.max_row}"
+        ws.print_title_rows = f"{header_row}:{header_row}"
 
     media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     buf.seek(0)
