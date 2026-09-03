@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
   CheckCircle2,
+  Download,
   Eye,
   FileSpreadsheet,
   Loader2,
@@ -11,7 +12,13 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { previewWorkbook, uploadWorkbook, type SampleRow, type UploadResult } from "@/lib/admin";
+import {
+  downloadUploadTemplate,
+  previewWorkbook,
+  uploadWorkbook,
+  type SampleRow,
+  type UploadResult,
+} from "@/lib/admin";
 import { clearStatsCache } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { Button, Field, Select } from "@/components/ui/primitives";
@@ -44,6 +51,7 @@ export function StatUpload({
   const [result, setResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [templating, setTemplating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pick = useCallback((f: File | undefined) => {
@@ -73,6 +81,18 @@ export function StatUpload({
     }
   }
 
+  async function getTemplate() {
+    setTemplating(true);
+    setError(null);
+    try {
+      await downloadUploadTemplate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Shablon alınbadı");
+    } finally {
+      setTemplating(false);
+    }
+  }
+
   async function send() {
     if (!file || !category) return;
     setBusy(true);
@@ -94,18 +114,25 @@ export function StatUpload({
 
   return (
     <div className="space-y-3.5">
-      <Field
-        label="Bólim"
-        hint="Fayl qaysı bólimge tiyisli ekeni atınan bilinbeydi — ashıq saylanadı"
-      >
-        <Select value={category} onChange={(e) => changeCategory(e.target.value)}>
-          {sourceDirs.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <div className="flex items-end gap-2.5">
+        <Field
+          label="Bólim"
+          hint="Fayl qaysı bólimge tiyisli ekeni atınan bilinbeydi — ashıq saylanadı"
+          className="flex-1"
+        >
+          <Select value={category} onChange={(e) => changeCategory(e.target.value)}>
+            {sourceDirs.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Button type="button" variant="outline" onClick={getTemplate} disabled={templating}>
+          {templating ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          Shablon
+        </Button>
+      </div>
 
       <div
         onDragOver={(e) => {

@@ -57,11 +57,15 @@ _CODE_RE = re.compile(
     r"^\s*(?P<year>(19|20)\d{2})\s*(?P<kind>[mм]|[qк])\s*(?P<no>\d{1,2})\s*$", re.I
 )
 
-# Statistika 2005-yildan boshlanadi, prognozlar 2031-yilgacha boradi.
-# Chegara MAJBURIY: usiz "20.55" kabi foiz qiymatlari 2055-yil deb
-# o'qiladi va sarlavha qatori noto'g'ri aniqlangan fayllarda ma'lumot
-# buziladi (109 fayldan bittasida aynan shunday bo'lgan).
-_YEAR_MIN, _YEAR_MAX = 2000, 2032
+# Statistika 2005-yildan boshlanadi, prognozlar bir necha yil oldinga
+# boradi. Yuqori chegara "hozirgi yil + zaxira" tarzida hisoblanadi —
+# shunda har yili qo'lda ko'tarish shart emes. Chegara MAJBURIY: usiz
+# "20.55" kabi foiz qiymatlari 2055-yil deb o'qiladi va sarlavha qatori
+# noto'g'ri aniqlangan fayllarda ma'lumot buziladi (109 fayldan
+# bittasida aynan shunday bo'lgan).
+_YEAR_MIN = 2000
+_YEAR_MARGIN = 10
+_YEAR_MAX = dt.date.today().year + _YEAR_MARGIN
 
 
 @dataclass(frozen=True, slots=True)

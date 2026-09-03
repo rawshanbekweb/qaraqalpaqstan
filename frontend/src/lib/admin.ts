@@ -187,6 +187,25 @@ export async function downloadExport(params: { category_id?: string }): Promise<
   URL.revokeObjectURL(url);
 }
 
+/** Júklew ushın tolтırılıwı kerek úlgi Excel fayldı brauzerge alıp túsedi. */
+export async function downloadUploadTemplate(): Promise<void> {
+  const res = await fetch(`${BASE}/api/stats/upload/template`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "statistika-shablon.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Ko'rsatkichlar ma'lumotnomasi — o'qish uchun, keshdan foydalanadi. */
 export function searchIndicators(params: {
   q?: string;

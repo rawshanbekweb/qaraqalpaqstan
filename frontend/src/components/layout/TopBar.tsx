@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { LayoutGrid, LogOut, MapPin, Radio, ShieldCheck } from "lucide-react";
+import { LayoutGrid, LogOut, MapPin, Menu, Radio, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DISTRICT_BY_ID } from "@/data/districts";
@@ -23,7 +23,7 @@ const NO_SUBSCRIBE = () => () => {};
  */
 export function TopBar() {
   const pathname = usePathname();
-  const { selectedDistrict, selectDistrict } = useDashboard();
+  const { selectedDistrict, selectDistrict, mobileNavOpen, setMobileNavOpen } = useDashboard();
   const router = useRouter();
   // Sessiya cookie'da — serverda o'qilmaydi, shuning uchun tashqi "store" sifatida
   const role = useSyncExternalStore(NO_SUBSCRIBE, () => getSession()?.role ?? null, () => null);
@@ -41,8 +41,17 @@ export function TopBar() {
   return (
     <header
       style={{ height: HEADER_HEIGHT }}
-      className="fixed inset-x-0 top-0 z-[110] flex w-full items-center justify-between gap-4 bg-cerr-navy px-6 py-3"
+      className="fixed inset-x-0 top-0 z-[110] flex w-full items-center justify-between gap-2 bg-cerr-navy px-3 py-3 sm:gap-4 sm:px-6"
     >
+      {/* Mobil menyu ashıw — NavDrawer tar ekranda dizimnen shıǵarılǵan, usı túyme onı overlay retinde qaytadan kórsetedi */}
+      <button
+        onClick={() => setMobileNavOpen(!mobileNavOpen)}
+        className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-blue-100 ring-1 ring-white/15 transition hover:text-white md:hidden"
+        aria-label="Menyu"
+      >
+        <Menu size={18} />
+      </button>
+
       {/* Brend */}
       <Link
         href="/dashboard"

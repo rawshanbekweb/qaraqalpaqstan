@@ -13,6 +13,7 @@ from datetime import datetime
 import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
@@ -20,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.ingest.excel import Record, parse_bytes
+from app.ingest.excel import Record, _YEAR_MAX, _YEAR_MIN, parse_bytes
 from app.ingest.loader import CATEGORIES, keep_known, load_records
 from app.models import District, StatCategory, StatIndicator, StatObservation
 from app.security import require_admin
@@ -341,6 +342,96 @@ def _sample_records(records: list[Record], db: Session, limit: int = 20) -> list
         }
         for r in list(by_indicator.values())[:limit]
     ]
+
+
+def _build_upload_template(db: Session) -> io.BytesIO:
+    """
+    Júklew ushın úlgi — eń keń tarqalǵan "dáwirler bağаnada, rayonlar
+    qatarda" forması (`ingest/excel.py`dağı `_parse_wide`). "Úlgi"
+    varağında rayon atları HAQIYQIY (bazadan alınǵan, sonlıqtan
+    tanılıwı kepillengen) hám mısal sanlar menen tayar keste bar — usı
+    kúyinde de "Ko'riw" túymesi arqalı dárhal parslanadı, sonda admin
+    format durıslığın júklewden aldın kóre aladı.
+    """
+    districts = db.scalars(select(District).order_by(District.name)).all()
+    year0 = datetime.now().year
+    years = [year0 - 2, year0 - 1, year0]
+
+    wb = Workbook()
+
+    info = wb.active
+    info.title = "Nusqama"
+    info.sheet_view.showGridLines = False
+    info.column_dimensions["A"].width = 92
+    lines = [
+        ("Bul fayldı qalay tolтırıw kerek", True),
+        ("", False),
+        ("«Úlgi» varağında bir kórsetkishtiń mısalı bar — rayonlar qatarda, jıllar bağаnada.", False),
+        ("1-qatardağı sarlawha atın (A1) óz kórsetkishińiздиń atına ózgertiń.", False),
+        ("«Ólshem birligi» bağаnasına birlikti jazıń — mısalı: mlrd. som, %, adam, dana, ga.", False),
+        (f"Jıl bağаnaların kerekli sanğa deyin qosıń yamasa ózgertiń ({_YEAR_MIN}–{_YEAR_MAX} aralığında).", False),
+        ("Rayon atların ÓZGERTPEŃ — dál usı jazılıwda tanıladı; qatar tártibi áhmiyetsiz.", False),
+        ("Belgisiz yamasa boS qaldırılğan katak — sol dáwir ushın maǵlıwmat joq dep esaplanadı.", False),
+        ("Bir fayldıń bir varağında bir ǵana kórsetkish bolsa — eń isenimli nátiyje sonda.", False),
+        ("", False),
+        ("Tolтırıp bolğannan keyin: admin panelde «Bólim» tańlań, faylды taslań, «Ko'riw»", False),
+        ("túymesin basıń — server namuna qatarlardı kórsetedi, sol jerde tekserip alasız.", False),
+        ("Hesh nárse saqlanbaydı, «Tastıyıqlaw hám bazağa jazıw» basılğanşa.", False),
+    ]
+    for i, (text, bold) in enumerate(lines, start=1):
+        cell = info.cell(row=i, column=1, value=text)
+        cell.font = Font(bold=bold, size=13 if bold else 11, color="1F2937")
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    sheet = wb.create_sheet("Úlgi")
+    sheet.sheet_view.showGridLines = False
+    columns = ["Rayon", "Ólshem birligi", *[str(y) for y in years]]
+
+    # 1-qatar — kórsetkish atı (parser bunı "sarlawha" dep oqıydı, dáwir
+    # qatarınıń ÚSTİNDE turıwı shárt); 2-qatar — dáwir sarlawhaları;
+    # 3-qatardan maǵlıwmat baslanadı.
+    title_cell = sheet.cell(row=1, column=1, value="Ónim kólemi (mısal — óz kórsetkishińizdiń atına ózgertiń)")
+    title_cell.font = Font(bold=True, size=12, color="1F2937")
+    sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(columns))
+
+    header_row = 2
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="2563EB")
+    header_border = Border(bottom=Side(style="thin", color="1E3A8A"))
+    for idx, name in enumerate(columns, start=1):
+        cell = sheet.cell(row=header_row, column=idx, value=name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = header_border
+        cell.alignment = Alignment(vertical="center")
+
+    for r, d in enumerate(districts, start=header_row + 1):
+        sheet.cell(row=r, column=1, value=d.name)
+        sheet.cell(row=r, column=2, value="mlrd. som")
+        for c, _year in enumerate(years, start=3):
+            sheet.cell(row=r, column=c, value=round(100 + r * 3.7 + c * 5.1, 1))
+
+    sheet.column_dimensions["A"].width = 22
+    sheet.column_dimensions["B"].width = 16
+    for c in range(3, 3 + len(years)):
+        sheet.column_dimensions[get_column_letter(c)].width = 12
+    sheet.freeze_panes = f"A{header_row + 1}"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@router.get("/upload/template", dependencies=[Depends(require_admin)])
+def upload_template(db: Session = Depends(get_db)):
+    """Tolтırılıwı kerek úlgi Excel fayldı qaytaradı (admin panelindegi «Shablon» túymesi)."""
+    buf = _build_upload_template(db)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="statistika-shablon.xlsx"'},
+    )
 
 
 @router.post("/upload/preview", dependencies=[Depends(require_admin)])

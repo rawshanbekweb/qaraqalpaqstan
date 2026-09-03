@@ -19,6 +19,11 @@ interface DashboardState {
   /** KPI sahifasında grafiklerdi bir tumanǵa tarlaw ushın ulanadı. */
   selectedDistrict: string | null;
   selectDistrict: (id: string | null) => void;
+
+  // ── Mobil naviqasiya ──
+  /** Tar ekranda `NavDrawer` háreket etpeydi, sonlıqtan overlay retinde ashıladı-jabıladı. */
+  mobileNavOpen: boolean;
+  setMobileNavOpen: (open: boolean) => void;
 }
 
 export const useDashboard = create<DashboardState>((set) => ({
@@ -29,4 +34,7 @@ export const useDashboard = create<DashboardState>((set) => ({
 
   selectedDistrict: null,
   selectDistrict: (selectedDistrict) => set({ selectedDistrict }),
+
+  mobileNavOpen: false,
+  setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
 }));
