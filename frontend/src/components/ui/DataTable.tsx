@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Download, Search } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { downloadExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/primitives";
@@ -49,6 +49,15 @@ export function DataTable<T>({
   emptyLabel?: string;
 }) {
   const [q, setQ] = useState("");
+  // Input ózi hár hárıptе dárhal jańalanadı (kórinis ushın), al filtrlew/
+  // saralaw 150ms keshiktiriledi — 1000+ qatarlı jadvallarda (kórsetkishler
+  // ma'lumotnomasi, jadval beti) hár basılǵan hárıp ushın qayta esaplawdı
+  // болдырмау ushın.
+  const [debouncedQ, setDebouncedQ] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 150);
+    return () => clearTimeout(t);
+  }, [q]);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [hidden, setHidden] = useState<Set<string>>(
@@ -59,7 +68,7 @@ export function DataTable<T>({
   const visibleColumns = columns.filter((c) => !hidden.has(c.key));
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = debouncedQ.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((r) =>
       columns.some((c) => {
@@ -67,7 +76,7 @@ export function DataTable<T>({
         return text.toLowerCase().includes(needle);
       }),
     );
-  }, [rows, q, columns]);
+  }, [rows, debouncedQ, columns]);
 
   const sorted = useMemo(() => {
     const col = columns.find((c) => c.key === sortKey);
