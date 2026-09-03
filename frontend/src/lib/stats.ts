@@ -134,6 +134,19 @@ export interface PeriodBreakdownPoint {
   status: PlanStatus | null;
 }
 
+/** Backend'degi PERIOD_RANK penen sáykes — dáwir baǵanasın xronologiyalıq sanlıq tártipte saralaw ushın. */
+const PERIOD_RANK: Record<PeriodBreakdownPoint["period"], number> = {
+  month: 0,
+  quarter: 1,
+  ytd: 2,
+  year: 3,
+};
+
+/** `${period}-${period_no}` ornına — 10-12 aylar 2-aydan burın kelip qalmawı ushın. */
+export function periodSortKey(p: Pick<PeriodBreakdownPoint, "period" | "period_no">): number {
+  return PERIOD_RANK[p.period] * 100 + (p.period_no ?? 0);
+}
+
 export interface PeriodBreakdown {
   indicator: IndicatorBrief;
   year: number;

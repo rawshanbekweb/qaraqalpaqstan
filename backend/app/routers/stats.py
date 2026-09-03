@@ -511,7 +511,7 @@ def export_data(
             for label, part in df.groupby("Bólim", sort=False):
                 sheet = _sheet_name(str(label), taken)
                 part.to_excel(writer, index=False, sheet_name=sheet, startrow=1)
-                _write_sheet(writer.sheets[sheet], part, str(label))
+                _write_sheet(writer.sheets[sheet], part, f"Qaraqalpaqstan statistikası — {label}")
 
     media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     buf.seek(0)

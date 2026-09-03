@@ -323,6 +323,30 @@ def meta(db: Session) -> dict:
 # ── Qator (yillar bo'yicha) ──────────────────────────────────────────
 
 
+def _scope_by_district(db: Session, stmt, indicator_id: int, district_id: str | None):
+    """
+    `district_id` berilgen bolsa sol boyınsha filtrleydi; bolmasa
+    respublika qatarı bar-joǵına qarap tańlaydı — bar bolsa sol
+    (`aggregated=False`), joq bolsa tuman-tuman jıyındısı
+    (`aggregated=True`) qaytadı.
+    """
+    if district_id:
+        return stmt.where(StatObservation.district_id == district_id), False
+    has_republic = db.scalar(
+        select(func.count(StatObservation.id)).where(
+            StatObservation.indicator_id == indicator_id,
+            StatObservation.district_id.is_(None),
+        )
+    )
+    aggregated = not has_republic
+    stmt = (
+        stmt.where(StatObservation.district_id.is_not(None))
+        if aggregated
+        else stmt.where(StatObservation.district_id.is_(None))
+    )
+    return stmt, aggregated
+
+
 def series(
     db: Session,
     indicator: StatIndicator,
@@ -347,22 +371,7 @@ def series(
         StatObservation.plan_value,
     ).where(StatObservation.indicator_id == indicator.id)
 
-    aggregated = False
-    if district_id:
-        stmt = stmt.where(StatObservation.district_id == district_id)
-    else:
-        has_republic = db.scalar(
-            select(func.count(StatObservation.id)).where(
-                StatObservation.indicator_id == indicator.id,
-                StatObservation.district_id.is_(None),
-            )
-        )
-        aggregated = not has_republic
-        stmt = (
-            stmt.where(StatObservation.district_id.is_not(None))
-            if aggregated
-            else stmt.where(StatObservation.district_id.is_(None))
-        )
+    stmt, aggregated = _scope_by_district(db, stmt, indicator.id, district_id)
 
     if year_from:
         stmt = stmt.where(StatObservation.year >= year_from)
@@ -438,33 +447,23 @@ def period_breakdown(
         StatObservation.district_id, StatObservation.value, StatObservation.plan_value,
     ).where(StatObservation.indicator_id == indicator.id, StatObservation.year == year)
 
-    if district_id:
-        stmt = stmt.where(StatObservation.district_id == district_id)
-    else:
-        has_republic = db.scalar(
-            select(func.count(StatObservation.id)).where(
-                StatObservation.indicator_id == indicator.id,
-                StatObservation.district_id.is_(None),
-            )
-        )
-        stmt = (
-            stmt.where(StatObservation.district_id.is_not(None))
-            if not has_republic
-            else stmt.where(StatObservation.district_id.is_(None))
-        )
+    stmt, _ = _scope_by_district(db, stmt, indicator.id, district_id)
 
-    grouped: dict[tuple[str, int | None], dict] = {}
-    for period, period_no, _did, value, plan in db.execute(stmt).all():
-        g = grouped.setdefault((period, period_no), {"value": 0.0, "plan": 0.0, "has_plan": False})
-        g["value"] += float(value or 0)
+    # Hár bir (dáwir, dáwir nomeri) ushın huduq kesiminde jıynaymız —
+    # `series()` sıyaqlı, reja tek BARLIQ qiymeti bar huduqlarda rejasi
+    # da bar bolǵanda ǵana esaplanadı, bolmasa "jámi fakt" penen "úlken
+    # bólegi ushın reja" salıstırılıp, nadurıs status shıǵıp qaladı.
+    grouped: dict[tuple[str, int | None], tuple[dict[str | None, float], dict[str | None, float]]] = {}
+    for period, period_no, did, value, plan in db.execute(stmt).all():
+        values, plans = grouped.setdefault((period, period_no), ({}, {}))
+        values[did] = values.get(did, 0.0) + float(value or 0)
         if plan is not None:
-            g["plan"] += float(plan)
-            g["has_plan"] = True
+            plans[did] = plans.get(did, 0.0) + float(plan)
 
     out: list[dict] = []
-    for (period, period_no), g in grouped.items():
-        plan = g["plan"] if g["has_plan"] else None
-        value = g["value"]
+    for (period, period_no), (values, plans) in grouped.items():
+        value = sum(values.values())
+        plan = sum(plans.values()) if plans and plans.keys() == values.keys() else None
         out.append({
             "period": period,
             "period_no": period_no,

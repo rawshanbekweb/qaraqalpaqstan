@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import {
+  periodSortKey,
   shortUnit,
   useMapLayer,
   usePeriodBreakdown,
@@ -368,7 +369,7 @@ export default function JadvalPage() {
                     {
                       key: "caption",
                       header: "Dáwir",
-                      sortValue: (p) => `${p.period}-${p.period_no ?? 0}`,
+                      sortValue: (p) => periodSortKey(p),
                       render: (p) => <span className="font-medium text-ink">{p.caption}</span>,
                     },
                     {
