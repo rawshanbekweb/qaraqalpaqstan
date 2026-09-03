@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Download, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Download, FileText, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { downloadExcel } from "@/lib/excel";
-import { cn } from "@/lib/utils";
+import { printTable } from "@/lib/pdf";
+import { cn, formatDate } from "@/lib/utils";
 import { Input } from "@/components/ui/primitives";
 
 export interface DataTableColumn<T> {
@@ -125,6 +126,20 @@ export function DataTable<T>({
     );
   }
 
+  function exportPdf() {
+    const title = (exportName ?? "Jadval").replace(/-/g, " ");
+    printTable(
+      title,
+      `${sorted.length} qatar · ${formatDate(new Date().toISOString().slice(0, 10))}`,
+      visibleColumns.map((c) => ({
+        header: c.header,
+        value: (r: T) => (c.excelValue ?? c.sortValue)?.(r) ?? null,
+        align: c.align,
+      })),
+      sorted,
+    );
+  }
+
   return (
     <div className="space-y-2.5">
       {(searchable || exportName) && (
@@ -172,15 +187,26 @@ export function DataTable<T>({
             )}
           </div>
           {exportName && (
-            <button
-              type="button"
-              onClick={exportExcel}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-abyss/70 px-3 py-2 text-[12.5px] text-ink-2 ring-1 ring-edge/60 transition hover:text-ink"
-              title="Excel sıpatında júklep alıw"
-            >
-              <Download size={13} />
-              Excel
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={exportExcel}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-abyss/70 px-3 py-2 text-[12.5px] text-ink-2 ring-1 ring-edge/60 transition hover:text-ink"
+                title="Excel sıpatında júklep alıw"
+              >
+                <Download size={13} />
+                Excel
+              </button>
+              <button
+                type="button"
+                onClick={exportPdf}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-abyss/70 px-3 py-2 text-[12.5px] text-ink-2 ring-1 ring-edge/60 transition hover:text-ink"
+                title="PDF sıpatında basıp shıǵarıw/saqlaw"
+              >
+                <FileText size={13} />
+                PDF
+              </button>
+            </>
           )}
         </div>
       )}

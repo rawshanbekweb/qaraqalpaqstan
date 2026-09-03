@@ -58,13 +58,8 @@ export function TopBar() {
         className="flex shrink-0 items-center gap-2.5"
         onClick={() => selectDistrict(null)}
       >
-        <div className="relative grid size-10 place-items-center rounded-xl bg-gradient-to-br from-cyan via-iris to-magenta">
+        <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-cyan via-iris to-magenta">
           <Radio size={18} className="text-void" strokeWidth={2.4} />
-          <motion.span
-            className="absolute inset-0 rounded-xl ring-2 ring-cyan/60"
-            animate={{ scale: [1, 1.35], opacity: [0.5, 0] }}
-            transition={{ duration: 2.6, repeat: Infinity }}
-          />
         </div>
         <div className="hidden sm:block">
           <div className="text-[14.5px] leading-tight font-bold tracking-tight text-white">

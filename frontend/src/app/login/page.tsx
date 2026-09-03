@@ -57,13 +57,8 @@ function LoginView() {
           className="hidden lg:block"
         >
           <div className="mb-6 inline-flex items-center gap-3">
-            <div className="relative grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-cyan via-iris to-magenta">
+            <div className="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-cyan via-iris to-magenta">
               <Radio size={23} className="text-void" strokeWidth={2.4} />
-              <motion.span
-                className="absolute inset-0 rounded-2xl ring-2 ring-cyan/60"
-                animate={{ scale: [1, 1.4], opacity: [0.55, 0] }}
-                transition={{ duration: 2.8, repeat: Infinity }}
-              />
             </div>
             <div>
               <div className="text-[12.5px] font-semibold tracking-[0.2em] text-cyan uppercase">
