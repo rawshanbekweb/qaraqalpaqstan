@@ -114,25 +114,30 @@ export function StatUpload({
 
   return (
     <div className="space-y-3.5">
-      <div className="flex items-end gap-2.5">
-        <Field
-          label="Bólim"
-          hint="Fayl qaysı bólimge tiyisli ekeni atınan bilinbeydi — ashıq saylanadı"
-          className="flex-1"
-        >
-          <Select value={category} onChange={(e) => changeCategory(e.target.value)}>
+      <Field
+        label="Bólim"
+        hint="Fayl qaysı bólimge tiyisli ekeni atınan bilinbeydi — ashıq saylanadı"
+      >
+        <div className="flex items-center gap-2.5">
+          <Select value={category} onChange={(e) => changeCategory(e.target.value)} className="flex-1">
             {sourceDirs.map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>
             ))}
           </Select>
-        </Field>
-        <Button type="button" variant="outline" onClick={getTemplate} disabled={templating}>
-          {templating ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-          Shablon
-        </Button>
-      </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={getTemplate}
+            disabled={templating}
+            className="shrink-0"
+          >
+            {templating ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            Shablon
+          </Button>
+        </div>
+      </Field>
 
       <div
         onDragOver={(e) => {
@@ -177,17 +182,17 @@ export function StatUpload({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {!preview && (
+      {!preview && (
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="button" onClick={runPreview} disabled={!file || previewing}>
             {previewing ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
             {previewing ? "Tekserilbekte…" : "Ko'riw"}
           </Button>
-        )}
-        <span className="text-[12.5px] text-ink-3">
-          Tek ǵana usı fayl tiygen kórsetkishler jańalanadı
-        </span>
-      </div>
+          <span className="text-[12.5px] text-ink-3">
+            Tek ǵana usı fayl tiygen kórsetkishler jańalanadı
+          </span>
+        </div>
+      )}
 
       <AnimatePresence>
         {error && (

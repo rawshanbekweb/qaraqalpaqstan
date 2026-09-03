@@ -1,15 +1,35 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, CalendarClock, Loader2, Plus, Trash2, User, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  CalendarClock,
+  Loader2,
+  Plus,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DISTRICTS, DISTRICT_BY_ID } from "@/data/districts";
 import { TASK_STATUS_LIST, taskStatus, type TaskStatusId } from "@/data/modules";
 import { MOCK_TASKS } from "@/data/mockTasks";
-import { createTask, deleteTask, listTasks, tasksConfigured, type Task } from "@/lib/tasks";
+import {
+  createTask,
+  deleteTask,
+  listTasks,
+  tasksConfigured,
+  updateTaskProgress,
+  type Task,
+} from "@/lib/tasks";
 import { useStatsMeta } from "@/lib/stats";
+import { getSession } from "@/lib/session";
 import { cn, daysLeft, formatDate } from "@/lib/utils";
 import { Button, Field, Input, Segmented, Select, Textarea } from "@/components/ui/primitives";
+
+/** useSyncExternalStore ushın ózgermeytuǵın "obuna bolmaw" funksiyası. */
+const NO_SUBSCRIBE = () => () => {};
 
 /**
  * Iqtisodiy topshiriqlar boshqaruvi.
@@ -18,6 +38,12 @@ import { Button, Field, Input, Segmented, Select, Textarea } from "@/components/
  * ham qolishi kerak, xotiradagi ro'yxat esa yo'qolib ketardi.
  */
 export function TaskBoard() {
+  // Sessiya cookie'da — serverda o'qilmaydi, shuning uchun tashqi "store" sifatida
+  const isAdmin = useSyncExternalStore(
+    NO_SUBSCRIBE,
+    () => getSession()?.role === "admin",
+    () => false,
+  );
   const configured = tasksConfigured();
   const [tasks, setTasks] = useState<Task[]>(() => (configured ? [] : MOCK_TASKS));
   const [filter, setFilter] = useState<TaskStatusId | "all">("all");
@@ -89,6 +115,22 @@ export function TaskBoard() {
     }
   }
 
+  async function updateProgress(task: Task, progress: number) {
+    if (demoMode) {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, progress } : t)));
+      return;
+    }
+    // Iymanlı jańalaw — server juwabın kútpey dárhal kórinis ózgeredi
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, progress } : t)));
+    try {
+      const saved = await updateTaskProgress(task.id, progress);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? saved : t)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ózgeris saqlanbadı");
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    }
+  }
+
   return (
     <div className="space-y-4">
       {error && (
@@ -121,19 +163,21 @@ export function TaskBoard() {
           ]}
         />
         <div className="flex-1" />
-        <Button
-          type="button"
-          onClick={() => setCreating((v) => !v)}
-          variant={creating ? "outline" : "solid"}
-          disabled={modules.length === 0}
-        >
-          {creating ? <X size={15} /> : <Plus size={15} />}
-          {creating ? "Biykarlaw" : "Jańa tapsırma"}
-        </Button>
+        {isAdmin && (
+          <Button
+            type="button"
+            onClick={() => setCreating((v) => !v)}
+            variant={creating ? "outline" : "solid"}
+            disabled={modules.length === 0}
+          >
+            {creating ? <X size={15} /> : <Plus size={15} />}
+            {creating ? "Biykarlaw" : "Jańa tapsırma"}
+          </Button>
+        )}
       </div>
 
       <AnimatePresence>
-        {creating && (
+        {isAdmin && creating && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -169,7 +213,9 @@ export function TaskBoard() {
                 index={i}
                 color={moduleColor(t.module_id)}
                 moduleName={moduleName(t.module_id)}
+                editable={isAdmin}
                 onRemove={() => void remove(t)}
+                onProgress={(p) => void updateProgress(t, p)}
               />
             ))}
           </AnimatePresence>
@@ -190,17 +236,43 @@ function TaskCard({
   index,
   color,
   moduleName,
+  editable,
   onRemove,
+  onProgress,
 }: {
   task: Task;
   index: number;
   color: string;
   moduleName: string;
+  /** `rahbar` (kóruwshi) rolinde tapsırmalar tek kóriw ushın — ózgertiw admin ǵana. */
+  editable: boolean;
   onRemove: () => void;
+  onProgress: (progress: number) => void;
 }) {
   const left = daysLeft(task.deadline);
   const overdue = left < 0 && task.progress < 100;
   const status = taskStatus(task.progress, task.deadline);
+
+  // Slider ózgeriwin lokal usılda kórsetediw, tek `onPointerUp`/`onKeyUp`da
+  // saqlaw ushın — `task.progress` sırttan (server yamasa basqa kartochka)
+  // ózgerse, render waqtında sáykeslestiremiz (effekt emes, React'tıń
+  // usınǵan "adjust state during render" úlgisi).
+  const [localProgress, setLocalProgress] = useState(task.progress);
+  const [syncedProgress, setSyncedProgress] = useState(task.progress);
+  if (task.progress !== syncedProgress) {
+    setSyncedProgress(task.progress);
+    setLocalProgress(task.progress);
+  }
+  const commit = () => {
+    if (localProgress !== task.progress) onProgress(localProgress);
+  };
+
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  useEffect(() => {
+    if (!confirmingRemove) return;
+    const t = setTimeout(() => setConfirmingRemove(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmingRemove]);
 
   return (
     <motion.article
@@ -224,6 +296,12 @@ function TaskCard({
         <span>{moduleName}</span>
       </div>
 
+      {task.description && (
+        <p className="line-clamp-2 text-[12.5px] leading-relaxed text-ink-2" title={task.description}>
+          {task.description}
+        </p>
+      )}
+
       {/* Progress jolaǵı ornına — tolıq enli status túymesi */}
       <div
         className={cn(
@@ -232,6 +310,25 @@ function TaskCard({
         )}
       >
         {status.label}
+      </div>
+
+      <div className="flex items-center gap-2.5">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={localProgress}
+          disabled={!editable}
+          onChange={(e) => setLocalProgress(Number(e.target.value))}
+          onPointerUp={commit}
+          onKeyUp={commit}
+          aria-label="Orınlanıw payızın ózgertiw"
+          className="h-1.5 flex-1 accent-cyan disabled:cursor-default enabled:cursor-pointer"
+        />
+        <span className="tnum w-9 shrink-0 text-right text-[12px] text-ink-3">
+          {localProgress}%
+        </span>
       </div>
 
       <div className="flex items-center gap-2 border-t border-hairline/60 pt-2.5 text-[12px]">
@@ -245,14 +342,36 @@ function TaskCard({
           {formatDate(task.deadline)}
           {overdue ? ` (${Math.abs(left)} kún keshikti)` : ""}
         </span>
-        <button
-          onClick={onRemove}
-          title="Óshiriw"
-          aria-label="Óshiriw"
-          className="grid size-6 shrink-0 place-items-center rounded text-ink-3 transition hover:text-coral"
-        >
-          <Trash2 size={12} />
-        </button>
+        {editable &&
+          (confirmingRemove ? (
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={onRemove}
+                title="Ashıq — óshiriw"
+                aria-label="Ashıq — óshiriw"
+                className="grid size-6 place-items-center rounded bg-crimson/15 text-crimson transition hover:bg-crimson/25"
+              >
+                <Check size={12} />
+              </button>
+              <button
+                onClick={() => setConfirmingRemove(false)}
+                title="Biykarlaw"
+                aria-label="Biykarlaw"
+                className="grid size-6 place-items-center rounded text-ink-3 transition hover:text-ink"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={() => setConfirmingRemove(true)}
+              title="Óshiriw"
+              aria-label="Óshiriw"
+              className="grid size-6 shrink-0 place-items-center rounded text-ink-3 transition hover:text-coral"
+            >
+              <Trash2 size={12} />
+            </button>
+          ))}
       </div>
     </motion.article>
   );
