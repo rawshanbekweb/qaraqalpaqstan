@@ -204,7 +204,7 @@ export default function DashboardPage() {
             .map((m) => ({ label: m.name, value: m.share ?? 0, color: m.color })),
         }
       : null
-    : overview && overview.modules.length > 1
+    : overview && overview.modules.filter((m) => m.yoy !== null).length > 1
       ? {
           id: `kpi-modules-${year}`,
           kind: "bar",
@@ -212,7 +212,13 @@ export default function DashboardPage() {
           subtitle: `${year}-jıl · ótken jılǵa salıstırǵanda, %`,
           unit: "%",
           series: [{ key: "value", label: "Ósiw" }],
+          // `m.yoy` bazıda null boladı (mısalı jıl ele tamamlanbaǵan
+          // bolsa, tolıq aldınǵı jıl menen salıstırıw múmkin emes).
+          // Olardı 0'ge aylandırıp qoyıw "ósiw joq" degen nadurıs
+          // maǵlıwmat kórsetedi — sonıń ornına butinley shıǵarıp
+          // taslaymız (profildegi share grafigi sıyaqlı).
           data: [...overview.modules]
+            .filter((m) => m.yoy !== null)
             .sort((a, b) => (b.yoy ?? 0) - (a.yoy ?? 0))
             .map((m) => ({
               label: modules.find((mm) => mm.id === m.module)?.short ?? m.name,
