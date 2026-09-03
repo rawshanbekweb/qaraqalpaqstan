@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import District, EconomicTask, Module
 from app.schemas import DistrictOut, ModuleOut, TaskIn, TaskOut, TaskUpdate
-from app.security import require_admin
+from app.security import current_user, require_admin
 
 router = APIRouter(prefix="/api", tags=["data"])
 
@@ -33,7 +33,7 @@ def list_modules(db: Session = Depends(get_db)):
 # ── Topshiriqlar ─────────────────────────────────────────────────────
 
 
-@router.get("/tasks", response_model=list[TaskOut])
+@router.get("/tasks", response_model=list[TaskOut], dependencies=[Depends(current_user)])
 def list_tasks(
     db: Session = Depends(get_db),
     district_id: str | None = None,

@@ -4,13 +4,17 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+from app.ratelimit import rate_limit
 from app.schemas import LoginRequest, TokenResponse
 from app.security import create_access_token, current_user, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+#: Parol izlew (brute-force) qıyınlasın — bir IP'den minutına 5 urınıs
+_login_limit = rate_limit(limit=5, window_seconds=60)
 
-@router.post("/login", response_model=TokenResponse)
+
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(_login_limit)])
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.scalar(select(User).where(User.username == payload.username.strip().lower()))
     if not user or not verify_password(payload.password, user.password_hash):
