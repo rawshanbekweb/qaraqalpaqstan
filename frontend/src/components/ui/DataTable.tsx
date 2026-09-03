@@ -187,10 +187,23 @@ export function DataTable<T>({
                   <th
                     key={c.key}
                     onClick={() => toggleSort(c)}
+                    role={c.sortValue ? "button" : undefined}
+                    tabIndex={c.sortValue ? 0 : undefined}
+                    onKeyDown={
+                      c.sortValue
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleSort(c);
+                            }
+                          }
+                        : undefined
+                    }
                     className={cn(
                       "px-3 py-2.5 text-[11.5px] font-semibold tracking-wider text-ink-3 uppercase",
                       c.align === "right" ? "text-right" : "text-left",
-                      c.sortValue && "cursor-pointer select-none hover:text-ink-2",
+                      c.sortValue &&
+                        "cursor-pointer select-none hover:text-ink-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan/70",
                     )}
                   >
                     <span

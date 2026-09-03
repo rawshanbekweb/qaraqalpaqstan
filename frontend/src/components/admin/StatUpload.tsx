@@ -245,6 +245,7 @@ export function StatUpload({
               </span>
               <button
                 onClick={() => setResult(null)}
+                aria-label="Jabıw"
                 className="grid size-7 place-items-center rounded-md text-ink-3 hover:text-coral"
               >
                 <X size={14} />

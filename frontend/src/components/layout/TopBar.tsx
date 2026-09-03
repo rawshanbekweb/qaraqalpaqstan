@@ -106,6 +106,7 @@ export function TopBar() {
           }}
           className="grid size-10 place-items-center rounded-xl bg-white/10 text-blue-200 ring-1 ring-white/15 transition hover:text-coral"
           title="Shıǵıw"
+          aria-label="Shıǵıw"
         >
           <LogOut size={15} />
         </button>
@@ -144,6 +145,7 @@ export function AdminTopBar({ title }: { title: string }) {
         }}
         className="grid size-10 place-items-center rounded-xl bg-abyss/70 text-ink-3 ring-1 ring-edge/60 transition hover:text-coral"
         title="Shıǵıw"
+        aria-label="Shıǵıw"
       >
         <LogOut size={15} />
       </button>

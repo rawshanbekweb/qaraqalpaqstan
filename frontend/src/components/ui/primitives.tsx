@@ -1,6 +1,7 @@
 "use client";
 
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn, trim } from "@/lib/utils";
 
@@ -267,7 +268,7 @@ function YearStep({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="grid size-8 shrink-0 place-items-center rounded-full text-[15px] leading-none text-ink-3 transition hover:bg-raised/60 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+      className="grid size-9 shrink-0 place-items-center rounded-full text-[15px] leading-none text-ink-3 transition hover:bg-raised/60 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
     >
       {children}
     </button>
@@ -382,6 +383,27 @@ export function Meter({
         animate={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }}
         transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
       />
+    </div>
+  );
+}
+
+// ── Qátelik xabarı ───────────────────────────────────────────────────
+
+/**
+ * So'row sátsizlengende kórsetiledi — usı bolmasa bet "júklenbekte…"
+ * halında mudam qalıp qoyadı, sebebi júklew hám qátelik eki qıylı
+ * bos/dápne kórinis beredi.
+ */
+export function ErrorNotice({ message, className }: { message: string; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2 rounded-xl bg-crimson/12 px-3.5 py-2.5 ring-1 ring-crimson/30",
+        className,
+      )}
+    >
+      <AlertTriangle size={15} className="mt-0.5 shrink-0 text-crimson" />
+      <span className="text-[13px] leading-relaxed text-coral">{message}</span>
     </div>
   );
 }

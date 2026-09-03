@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
 import { useDashboard } from "@/lib/store";
 import { useDistrictProfile, useOverview, useSeries, useStatsMeta, shortUnit } from "@/lib/stats";
-import { Segmented, YearScale } from "@/components/ui/primitives";
+import { ErrorNotice, Segmented, YearScale } from "@/components/ui/primitives";
 import { HeroFigure, StatTile } from "@/components/charts/StatTile";
 import { ChartRenderer } from "@/components/charts/ChartRenderer";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
@@ -35,10 +35,11 @@ interface ModuleRow {
 export default function DashboardPage() {
   const { moduleId, setModule, year, setYear, selectedDistrict, selectDistrict } = useDashboard();
   const [view, setView] = useState<"cards" | "table">("cards");
-  const { data: meta } = useStatsMeta();
-  const { data: overview } = useOverview(year || null);
-  const { data: profile } = useDistrictProfile(selectedDistrict, year || null);
+  const { data: meta, error: metaError } = useStatsMeta();
+  const { data: overview, error: overviewError } = useOverview(year || null);
+  const { data: profile, error: profileError } = useDistrictProfile(selectedDistrict, year || null);
   const { data: series } = useSeries(moduleId, selectedDistrict);
+  const loadError = metaError ?? overviewError ?? profileError;
 
   const modules = meta?.modules ?? [];
   const activeModule = modules.find((m) => m.id === moduleId) ?? modules[0];
@@ -246,6 +247,12 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {loadError && (
+        <ErrorNotice
+          message={`Maǵlıwmat júklenbedi: ${loadError.message}. Betti qaytadan ashıp kóriń.`}
+        />
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         {modules.length > 0 && (
           <Segmented<string>
@@ -277,7 +284,7 @@ export default function DashboardPage() {
         caption={
           profile
             ? `${dm?.rank ?? "—"}-orın · respublikanıń ${trim(dm?.share ?? 0)}% i`
-            : (om?.caption ?? "júklenbekte…")
+            : (om?.caption ?? (loadError ? "—" : "júklenbekte…"))
         }
       />
 

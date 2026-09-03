@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { ArrowRight, MapPin, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, Loader2, MapPin, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { useDashboard } from "@/lib/store";
 import { shortUnit, useMapLayer, useStatsMeta, type MapDistrict, type StatsDistrict } from "@/lib/stats";
 import { volumeColor } from "@/lib/scale";
 import { compact, trim } from "@/lib/utils";
-import { Panel, Segmented, YearScale } from "@/components/ui/primitives";
+import { ErrorNotice, Panel, Segmented, YearScale } from "@/components/ui/primitives";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
 import { EXCEL_NUM_FMT, EXCEL_PERCENT_FMT, EXCEL_SIGNED_PERCENT_FMT } from "@/lib/excel";
 
@@ -37,8 +37,9 @@ export default function DistrictsPage() {
   const { moduleId, setModule, year, setYear } = useDashboard();
   const [view, setView] = useState<"cards" | "table">("cards");
   const router = useRouter();
-  const { data: meta } = useStatsMeta();
-  const { data: layer } = useMapLayer(moduleId, year || null);
+  const { data: meta, loading: metaLoading, error: metaError } = useStatsMeta();
+  const { data: layer, error: layerError } = useMapLayer(moduleId, year || null);
+  const loadError = metaError ?? layerError;
 
   const modules = meta?.modules ?? [];
   const activeModule = modules.find((m) => m.id === moduleId) ?? modules[0];
@@ -194,6 +195,12 @@ export default function DistrictsPage() {
         </div>
       </div>
 
+      {loadError && (
+        <ErrorNotice
+          message={`Maǵlıwmat júklenbedi: ${loadError.message}. Betti qaytadan ashıp kóriń.`}
+        />
+      )}
+
       {view === "table" ? (
         <DataTable
           columns={districtColumns}
@@ -203,6 +210,15 @@ export default function DistrictsPage() {
           searchPlaceholder="Rayon izlew…"
           exportName={`rayonlar-${activeModule?.id ?? moduleId}-${year}`}
         />
+      ) : metaLoading ? (
+        <div className="flex items-center justify-center gap-2 py-16 text-[13.5px] text-ink-3">
+          <Loader2 size={15} className="animate-spin" />
+          Júklenbekte…
+        </div>
+      ) : districts.length === 0 ? (
+        <div className="grid place-items-center rounded-2xl bg-abyss/40 py-16 text-[13.5px] text-ink-3 ring-1 ring-edge/40">
+          {loadError ? "Rayonlar dizimi júklenbedi" : "Rayonlar tabılmadı"}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {districts.map((d, i) => (

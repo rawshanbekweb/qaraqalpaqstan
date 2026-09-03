@@ -199,30 +199,32 @@ function LoginView() {
               )}
             </Button>
 
-            <div className="pt-1">
-              <div className="mb-2 text-center text-[11.5px] tracking-wider text-ink-3 uppercase">
-                Demo esaplar
+            {process.env.NODE_ENV !== "production" && (
+              <div className="pt-1">
+                <div className="mb-2 text-center text-[11.5px] tracking-wider text-ink-3 uppercase">
+                  Demo esaplar (tek local rezim)
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {DEMO_CREDENTIALS.map((c) => (
+                    <button
+                      key={c.username}
+                      type="button"
+                      onClick={() => {
+                        setUsername(c.username);
+                        setPassword(c.password);
+                        setError(null);
+                      }}
+                      className="rounded-xl bg-abyss/60 px-2.5 py-2 text-left ring-1 ring-edge/50 transition hover:ring-cyan/50"
+                    >
+                      <div className="truncate text-[12.5px] font-semibold text-ink-2">{c.label}</div>
+                      <div className="tnum truncate text-[11.5px] text-ink-3">
+                        {c.username} / {c.password}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {DEMO_CREDENTIALS.map((c) => (
-                  <button
-                    key={c.username}
-                    type="button"
-                    onClick={() => {
-                      setUsername(c.username);
-                      setPassword(c.password);
-                      setError(null);
-                    }}
-                    className="rounded-xl bg-abyss/60 px-2.5 py-2 text-left ring-1 ring-edge/50 transition hover:ring-cyan/50"
-                  >
-                    <div className="truncate text-[12.5px] font-semibold text-ink-2">{c.label}</div>
-                    <div className="tnum truncate text-[11.5px] text-ink-3">
-                      {c.username} / {c.password}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
           </form>
         </motion.section>
       </div>

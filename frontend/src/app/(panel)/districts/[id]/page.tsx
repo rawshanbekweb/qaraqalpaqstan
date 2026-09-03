@@ -14,7 +14,7 @@ import {
   type OperationalKpi,
   type ProfileModule,
 } from "@/lib/stats";
-import { Panel, Segmented, YearScale } from "@/components/ui/primitives";
+import { ErrorNotice, Panel, Segmented, YearScale } from "@/components/ui/primitives";
 import { HeroFigure, StatTile } from "@/components/charts/StatTile";
 import { ChartRenderer } from "@/components/charts/ChartRenderer";
 import { DataTable, cellNum, type DataTableColumn } from "@/components/ui/DataTable";
@@ -37,8 +37,8 @@ export default function DistrictProfilePage() {
   const { moduleId, setModule, year, setYear } = useDashboard();
   const [modulesView, setModulesView] = useState<"cards" | "table">("cards");
   const [opView, setOpView] = useState<"cards" | "table">("cards");
-  const { data: meta } = useStatsMeta();
-  const { data: profile, loading } = useDistrictProfile(districtId, year || null);
+  const { data: meta, error: metaError } = useStatsMeta();
+  const { data: profile, loading, error: profileError } = useDistrictProfile(districtId, year || null);
   const { data: series } = useSeries(moduleId, districtId);
 
   const modules = meta?.modules ?? [];
@@ -199,7 +199,9 @@ export default function DistrictProfilePage() {
   if (year > 0 && !loading && !profile) {
     return (
       <div className="flex flex-col items-center gap-3 py-20 text-center">
-        <p className="text-[15px] text-ink-3">Bul rayon tabılmadı</p>
+        <p className="text-[15px] text-ink-3">
+          {profileError ? `Maǵlıwmat júklenbedi: ${profileError.message}` : "Bul rayon tabılmadı"}
+        </p>
         <Link
           href="/districts"
           className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-cyan hover:underline"
@@ -252,6 +254,12 @@ export default function DistrictProfilePage() {
           <YearScale years={years} value={year} onChange={setYear} />
         </div>
       </div>
+
+      {metaError && (
+        <ErrorNotice
+          message={`Bazalıq maǵlıwmat júklenbedi: ${metaError.message}. Betti qaytadan ashıp kóriń.`}
+        />
+      )}
 
       {profile && profile.operational.length > 0 && (
         <div>
@@ -380,7 +388,12 @@ export default function DistrictProfilePage() {
                     className="flex items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition hover:bg-raised/40"
                   >
                     <span className="size-2.5 shrink-0 rounded-full" style={{ background: m.color }} />
-                    <span className="w-28 shrink-0 truncate text-[13px] text-ink-2">{m.name}</span>
+                    <span
+                      title={m.name}
+                      className="w-28 shrink-0 truncate text-[13px] text-ink-2 sm:w-32 md:w-40"
+                    >
+                      {m.name}
+                    </span>
                     <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-abyss/70">
                       <motion.span
                         className="absolute inset-y-0 left-0 rounded-full"

@@ -248,6 +248,7 @@ function TaskCard({
         <button
           onClick={onRemove}
           title="Óshiriw"
+          aria-label="Óshiriw"
           className="grid size-6 shrink-0 place-items-center rounded text-ink-3 transition hover:text-coral"
         >
           <Trash2 size={12} />
