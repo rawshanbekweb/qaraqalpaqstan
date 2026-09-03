@@ -50,6 +50,15 @@ export interface TouchedIndicator {
   yangi: boolean;
 }
 
+export interface SampleRow {
+  korsetkish: string;
+  rayon: string;
+  jıl: number;
+  dawir: string;
+  qıymet: number;
+  olshem: string;
+}
+
 export interface UploadResult {
   file: string;
   category: string;
@@ -62,6 +71,8 @@ export interface UploadResult {
   sebep_belgisiz_rayon: number;
   sebep_qaytalanma: number;
   korsetkishler: TouchedIndicator[];
+  /** Tek `preview`de keledi — parsıńǵan haqıyqıy qatarlardan namuna */
+  namuna?: SampleRow[];
 }
 
 export async function readError(res: Response): Promise<string> {

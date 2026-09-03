@@ -422,6 +422,61 @@ def series(
     return points
 
 
+def period_breakdown(
+    db: Session, indicator: StatIndicator, year: int, *, district_id: str | None = None
+) -> list[dict]:
+    """
+    Berilgen jıldaǵı BARLIQ dáwir jazıwları — `series()` sıyaqlı "eń
+    tolıq" birewin tańlamay, hámmesin qaytaradı. Sonday etip, bir jılda
+    tolıq jıllıq qatar menen birge shereklik yamasa aylıq qatar da bolsa
+    (mısalı bahalar hám sanaat fayllarında), ekewi de kórinedi — admin
+    yamasa qollanıwshı "1-sherek", "yanvar–iyun" kabi kesimlerdi kóre
+    aladı, tek jıllıq juwmaqtı emes.
+    """
+    stmt = select(
+        StatObservation.period, StatObservation.period_no,
+        StatObservation.district_id, StatObservation.value, StatObservation.plan_value,
+    ).where(StatObservation.indicator_id == indicator.id, StatObservation.year == year)
+
+    if district_id:
+        stmt = stmt.where(StatObservation.district_id == district_id)
+    else:
+        has_republic = db.scalar(
+            select(func.count(StatObservation.id)).where(
+                StatObservation.indicator_id == indicator.id,
+                StatObservation.district_id.is_(None),
+            )
+        )
+        stmt = (
+            stmt.where(StatObservation.district_id.is_not(None))
+            if not has_republic
+            else stmt.where(StatObservation.district_id.is_(None))
+        )
+
+    grouped: dict[tuple[str, int | None], dict] = {}
+    for period, period_no, _did, value, plan in db.execute(stmt).all():
+        g = grouped.setdefault((period, period_no), {"value": 0.0, "plan": 0.0, "has_plan": False})
+        g["value"] += float(value or 0)
+        if plan is not None:
+            g["plan"] += float(plan)
+            g["has_plan"] = True
+
+    out: list[dict] = []
+    for (period, period_no), g in grouped.items():
+        plan = g["plan"] if g["has_plan"] else None
+        value = g["value"]
+        out.append({
+            "period": period,
+            "period_no": period_no,
+            "caption": period_label(period, period_no),
+            "value": round(value, 2),
+            "plan": round(plan, 2) if plan is not None else None,
+            "status": plan_status(value, plan, indicator.lower_is_better),
+        })
+    out.sort(key=lambda r: period_key(r["period"], r["period_no"]))
+    return out
+
+
 # ── Xarita qatlami ───────────────────────────────────────────────────
 
 

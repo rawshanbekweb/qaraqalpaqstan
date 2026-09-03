@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { previewWorkbook, uploadWorkbook, type UploadResult } from "@/lib/admin";
+import { previewWorkbook, uploadWorkbook, type SampleRow, type UploadResult } from "@/lib/admin";
 import { clearStatsCache } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { Button, Field, Select } from "@/components/ui/primitives";
@@ -188,6 +188,9 @@ export function StatUpload({
               Bul tek ALDINNAN KÓRIW — házirshe bazaǵa hesh nárse jazılmadı
             </div>
             <ResultBody data={preview} />
+            {preview.namuna && preview.namuna.length > 0 && (
+              <SampleTable rows={preview.namuna} />
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hairline/60 pt-3">
               <Button type="button" onClick={send} disabled={busy}>
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
@@ -224,6 +227,52 @@ export function StatUpload({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Fayldan haqıyqıy oqılǵan bir nesha qatar — admin sanlarǵa ǵana emes,
+ * rayon/dáwir/san durıs tanılǵanına da kóz jetkeriwi ushın.
+ */
+function SampleTable({ rows }: { rows: SampleRow[] }) {
+  return (
+    <div className="mt-3 border-t border-hairline/60 pt-3">
+      <div className="mb-1.5 text-[12px] font-semibold text-ink-3 uppercase tracking-wide">
+        Namuna qatarlar ({rows.length})
+      </div>
+      <div className="thin-scroll max-h-[220px] overflow-y-auto rounded-xl ring-1 ring-edge/40">
+        <table className="w-full min-w-[480px] border-collapse text-[12px]">
+          <thead className="bg-abyss/70">
+            <tr>
+              {["Kórsetkish", "Rayon", "Dáwir", "Qıymet"].map((h) => (
+                <th
+                  key={h}
+                  className="px-2.5 py-1.5 text-left font-semibold tracking-wide text-ink-3 uppercase"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-t border-hairline/40">
+                <td className="max-w-[220px] truncate px-2.5 py-1.5 text-ink-2" title={r.korsetkish}>
+                  {r.korsetkish}
+                </td>
+                <td className="px-2.5 py-1.5 text-ink-3">{r.rayon}</td>
+                <td className="px-2.5 py-1.5 text-ink-3">
+                  {r.jıl} {r.dawir !== "jıl" ? r.dawir : ""}
+                </td>
+                <td className="tnum px-2.5 py-1.5 text-right text-ink">
+                  {r.qıymet} <span className="text-[10.5px] text-ink-3">{r.olshem}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

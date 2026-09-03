@@ -130,6 +130,24 @@ def indicator_detail(indicator_id: int, db: Session = Depends(get_db)):
     return st.indicator_detail(db, _resolve(db, indicator_id, None))
 
 
+@router.get("/indicators/{indicator_id}/breakdown")
+def indicator_period_breakdown(
+    indicator_id: int,
+    year: int,
+    district_id: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Berilgen jıldaǵı barlıq dáwir kesimleri (jıllıq, yarım jıllıq, sherek, ay)."""
+    ind = _resolve(db, indicator_id, None)
+    return {
+        "indicator": st.indicator_brief(ind),
+        "year": year,
+        "district_id": district_id,
+        "unit": ind.unit,
+        "points": st.period_breakdown(db, ind, year, district_id=district_id),
+    }
+
+
 # ── Admin ────────────────────────────────────────────────────────────
 
 
@@ -300,6 +318,31 @@ async def _parse_upload(file: UploadFile, category: str) -> list[Record]:
     return records
 
 
+def _sample_records(records: list[Record], db: Session, limit: int = 20) -> list[dict]:
+    """
+    Faylda parsıńǵannan bir nesheu haqıyqıy qatar — admin sanlarǵa ǵana emes,
+    NAMA oqılǵanına da kóz jetkiziwi ushın (rayon durıs tanılǵanba, san
+    durıs shıǵıp turba). Hár kórsetkishten bir qatar, kóp bolsa `limit`ge
+    shekem — sonda bir ǵana kórsetkishtiń on qatarı emes, alwan túrlilik
+    kórinedi.
+    """
+    dists = st.district_names(db)
+    by_indicator: dict[str, Record] = {}
+    for r in records:
+        by_indicator.setdefault(r.indicator, r)
+    return [
+        {
+            "korsetkish": r.indicator,
+            "rayon": dists[r.district_id].name if r.district_id in dists else "Respublika",
+            "jıl": r.year,
+            "dawir": st.period_label(r.period, r.period_no),
+            "qıymet": r.value,
+            "olshem": r.unit,
+        }
+        for r in list(by_indicator.values())[:limit]
+    ]
+
+
 @router.post("/upload/preview", dependencies=[Depends(require_admin)])
 async def upload_preview(
     file: UploadFile = File(...),
@@ -319,7 +362,13 @@ async def upload_preview(
         stats = load_records(records, db, replace_all=False, commit=False)
     finally:
         db.rollback()
-    return {"file": file.filename, "category": category, "preview": True, **stats}
+    return {
+        "file": file.filename,
+        "category": category,
+        "preview": True,
+        "namuna": _sample_records(records, db),
+        **stats,
+    }
 
 
 @router.post("/upload", dependencies=[Depends(require_admin)])
@@ -340,6 +389,68 @@ async def upload_workbook(
     return {"file": file.filename, "category": category, "preview": False, **stats}
 
 
+_EXPORT_COLUMNS = [
+    "Bólim", "Kórsetkish", "Ólshem", "Rayon", "Jıl",
+    "Dáwir", "Dáwir nomeri", "Qıymet", "Reja", "Derek",
+]
+_EXPORT_NUMBER_COLUMNS = {"Qıymet", "Reja"}
+_SHEET_NAME_BAD = re.compile(r"[\\/*?:\[\]]")
+
+
+def _sheet_name(label: str, taken: set[str]) -> str:
+    """
+    Excel varaq atı — eń kópi 31 belgi, `\\/*?:[]` bolmawı kerek.
+
+    Bir neshe bólim qısqartıwdan keyin birdey nomǵa túsiwi múmkin
+    (mısalı eki uzın nomniń birinshi 31 belgisi sáykes keliwi); bunday
+    jaǵdayda san qosıp ajıratamız, bolmasa `openpyxl` qátelik beredi.
+    """
+    base = _SHEET_NAME_BAD.sub("_", label).strip()[:31] or "Bólim"
+    name, n = base, 2
+    while name in taken:
+        suffix = f" ({n})"
+        name = base[: 31 - len(suffix)] + suffix
+        n += 1
+    taken.add(name)
+    return name
+
+
+def _write_sheet(ws, df: pd.DataFrame, title: str) -> None:
+    """Bitta varaqqa jazıw: title qatarı, formatlanǵan header, keńlikler, freeze."""
+    n_cols = len(_EXPORT_COLUMNS)
+    header_row = 2
+    first_data_row = header_row + 1
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
+    subtitle = f"{len(df)} qatar · {datetime.now():%Y-%m-%d %H:%M}"
+    title_cell = ws.cell(row=1, column=1, value=f"{title} · {subtitle}")
+    title_cell.font = Font(bold=True, size=12, color="1F2937")
+    title_cell.alignment = Alignment(vertical="center")
+    ws.row_dimensions[1].height = 22
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="2563EB")
+    header_border = Border(bottom=Side(style="thin", color="1E3A8A"))
+    for cell in ws[header_row]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = header_border
+        cell.alignment = Alignment(vertical="center")
+
+    for idx, name in enumerate(_EXPORT_COLUMNS, start=1):
+        col_letter = get_column_letter(idx)
+        content_width = df[name].astype(str).map(len).max() if len(df) else 0
+        width = max(len(name), content_width) + 2
+        ws.column_dimensions[col_letter].width = min(max(width, 8), 42)
+        if name in _EXPORT_NUMBER_COLUMNS:
+            for cell in ws[col_letter][first_data_row - 1:]:
+                cell.number_format = "#,##0.###"
+
+    ws.freeze_panes = f"A{first_data_row}"
+    ws.auto_filter.ref = f"A{header_row}:{get_column_letter(n_cols)}{ws.max_row}"
+    ws.print_title_rows = f"{header_row}:{header_row}"
+
+
 @router.get("/export", dependencies=[Depends(require_admin)])
 def export_data(
     category_id: str | None = None,
@@ -348,8 +459,11 @@ def export_data(
     """
     Bazadagi o'lchovlarni Excel qilip qaytaradi.
 
-    `category_id` berilmasa — butun baza. 24 mıńǵa jaqın qatar hátte
-    xlsx'te de tez jaratıladı, sonlıqtan fon jumısı kerek emes.
+    `category_id` berilse — bir varaqlı fayl, tek sol bólim. Berilmese —
+    butun baza, hár bólim ÓZ VARAǴINDA (bir tegis 24 mıń qatarlı varaqta
+    bólimler bir-birine sińip, kóz menen aylanıw qıyın bolar edi).
+    24 mıńǵa jaqın qatar hátte kóp varaqlı xlsx'te de tez jaratıladı,
+    sonlıqtan fon jumısı kerek emes.
     """
     stmt = (
         select(
@@ -380,55 +494,24 @@ def export_data(
         stmt = stmt.where(StatIndicator.category_id == category_id)
 
     rows = db.execute(stmt).all()
-    columns = [
-        "Bólim", "Kórsetkish", "Ólshem", "Rayon", "Jıl",
-        "Dáwir", "Dáwir nomeri", "Qıymet", "Reja", "Derek",
-    ]
-    df = pd.DataFrame(rows, columns=columns)
+    df = pd.DataFrame(rows, columns=_EXPORT_COLUMNS)
     # Bos "Rayon" — respublika boyınsha jıyındı qıymet, hudud emes
     df["Rayon"] = df["Rayon"].fillna("Respublika")
-    number_columns = {"Qıymet", "Reja"}
-
-    #: 1-qatar — title, 2-qatar — sarlawha, 3-qatardan maǵlıwmat baslanadı
-    n_cols = len(columns)
-    header_row = 2
-    first_data_row = header_row + 1
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Statistika", startrow=header_row - 1)
-        ws = writer.sheets["Statistika"]
-
-        # Title jolaǵı — bólim hám jaratılǵan waqıt
-        title = f"Qaraqalpaqstan statistikası — {category_name or 'barlıq bólimler'}"
-        subtitle = f"{len(df)} qatar · {datetime.now():%Y-%m-%d %H:%M}"
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
-        title_cell = ws.cell(row=1, column=1, value=f"{title} · {subtitle}")
-        title_cell.font = Font(bold=True, size=12, color="1F2937")
-        title_cell.alignment = Alignment(vertical="center")
-        ws.row_dimensions[1].height = 22
-
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill("solid", fgColor="2563EB")
-        header_border = Border(bottom=Side(style="thin", color="1E3A8A"))
-        for cell in ws[header_row]:
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = header_border
-            cell.alignment = Alignment(vertical="center")
-
-        for idx, name in enumerate(columns, start=1):
-            col_letter = get_column_letter(idx)
-            content_width = df[name].astype(str).map(len).max() if len(df) else 0
-            width = max(len(name), content_width) + 2
-            ws.column_dimensions[col_letter].width = min(max(width, 8), 42)
-            if name in number_columns:
-                for cell in ws[col_letter][first_data_row - 1:]:
-                    cell.number_format = "#,##0.###"
-
-        ws.freeze_panes = f"A{first_data_row}"
-        ws.auto_filter.ref = f"A{header_row}:{get_column_letter(n_cols)}{ws.max_row}"
-        ws.print_title_rows = f"{header_row}:{header_row}"
+        if category_id or df.empty:
+            title = f"Qaraqalpaqstan statistikası — {category_name or 'barlıq bólimler'}"
+            df.to_excel(writer, index=False, sheet_name="Statistika", startrow=1)
+            _write_sheet(writer.sheets["Statistika"], df, title)
+        else:
+            taken: set[str] = set()
+            # `sort=False` — qatarlar db'den bólim tártibi (`StatCategory.sort`)
+            # boyınsha kelgen, groupby usı tártipti buzbasın
+            for label, part in df.groupby("Bólim", sort=False):
+                sheet = _sheet_name(str(label), taken)
+                part.to_excel(writer, index=False, sheet_name=sheet, startrow=1)
+                _write_sheet(writer.sheets[sheet], part, str(label))
 
     media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     buf.seek(0)

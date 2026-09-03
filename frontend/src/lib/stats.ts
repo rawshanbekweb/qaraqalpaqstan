@@ -125,6 +125,23 @@ export interface Series {
   points: SeriesPoint[];
 }
 
+export interface PeriodBreakdownPoint {
+  period: "year" | "ytd" | "quarter" | "month";
+  period_no: number | null;
+  caption: string;
+  value: number;
+  plan: number | null;
+  status: PlanStatus | null;
+}
+
+export interface PeriodBreakdown {
+  indicator: IndicatorBrief;
+  year: number;
+  district_id: string | null;
+  unit: string;
+  points: PeriodBreakdownPoint[];
+}
+
 export interface ProfileModule {
   module: string;
   name: string;
@@ -331,6 +348,17 @@ export function useSeries(
     district_id: districtId ?? undefined,
     year_from: yearFrom,
     year_to: yearTo,
+  });
+}
+
+/**
+ * Bitta jıldıń ishindegi barlıq dáwir kesimleri (sherek, yarım jıl, ay) —
+ * `useSeries` hár jılǵa tek "eń tolıq" nuqtanı beredi, bul bolsa sonıń
+ * ishindegi barlıq qatarlardı.
+ */
+export function usePeriodBreakdown(indicatorId: number | null, year: number | null) {
+  return useStats<PeriodBreakdown>(indicatorId && year ? `/indicators/${indicatorId}/breakdown` : null, {
+    year: year ?? undefined,
   });
 }
 

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import {
   shortUnit,
   useMapLayer,
+  usePeriodBreakdown,
   useSeries,
   useStats,
   useStatsMeta,
@@ -33,6 +34,7 @@ export default function JadvalPage() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<IndicatorBrief | null>(null);
   const [year, setYear] = useState(0);
+  const [breakdownYear, setBreakdownYear] = useState<number | null>(null);
 
   const { data: meta } = useStatsMeta();
 
@@ -66,6 +68,8 @@ export default function JadvalPage() {
     selected?.has_districts ? effectiveYear || null : null,
     selected?.id ?? null,
   );
+
+  const { data: breakdown } = usePeriodBreakdown(selected?.id ?? null, breakdownYear);
 
   const unit = shortUnit(selected?.unit ?? "");
   const hasSeriesPlan = series?.points.some((p) => p.plan !== null) ?? false;
@@ -262,7 +266,10 @@ export default function JadvalPage() {
             {(data?.items ?? []).map((item) => (
               <tr
                 key={item.id}
-                onClick={() => setSelected(item)}
+                onClick={() => {
+                  setSelected(item);
+                  setBreakdownYear(null);
+                }}
                 className={cn(
                   "cursor-pointer border-t border-hairline/50 transition hover:bg-raised/35",
                   selected?.id === item.id && "bg-cyan/8",
@@ -336,14 +343,62 @@ export default function JadvalPage() {
           </div>
 
           <div>
-            <div className="mb-2.5 text-[13.5px] font-semibold text-ink">Jıllar boyınsha</div>
+            <div className="mb-2.5 flex items-center gap-2">
+              <span className="text-[13.5px] font-semibold text-ink">Jıllar boyınsha</span>
+              <span className="text-[12px] text-ink-3">
+                — bir jıldı basıń, ishinde sherek/ay bar bolsa kórinedi
+              </span>
+            </div>
             <DataTable
               columns={seriesColumns}
               rows={series?.points ?? []}
               getRowKey={(p) => `${p.year}-${p.label}`}
               searchable={false}
               exportName={`${selected.slug}-jillar`}
+              onRowClick={(p) => setBreakdownYear((y) => (y === p.year ? null : p.year))}
             />
+
+            {breakdownYear !== null && breakdown && breakdown.points.length > 1 && (
+              <div className="mt-2.5 rounded-2xl bg-abyss/50 p-3.5 ring-1 ring-cyan/25">
+                <div className="mb-2 text-[12.5px] font-semibold text-cyan">
+                  {breakdownYear}-jıl ishinde dáwir kesimleri
+                </div>
+                <DataTable
+                  columns={[
+                    {
+                      key: "caption",
+                      header: "Dáwir",
+                      sortValue: (p) => `${p.period}-${p.period_no ?? 0}`,
+                      render: (p) => <span className="font-medium text-ink">{p.caption}</span>,
+                    },
+                    {
+                      key: "value",
+                      header: "Qıymet",
+                      align: "right",
+                      sortValue: (p) => p.value,
+                      numFmt: EXCEL_NUM_FMT,
+                      render: (p) => (
+                        <span className="tnum">
+                          {trim(p.value)} <span className="text-[11px] text-ink-3">{unit}</span>
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "plan",
+                      header: "Reja",
+                      align: "right",
+                      sortValue: (p) => p.plan,
+                      numFmt: EXCEL_NUM_FMT,
+                      render: (p) => cellNum(p.plan, (n) => `${trim(n)} ${unit}`),
+                    },
+                  ]}
+                  rows={breakdown.points}
+                  getRowKey={(p) => `${p.period}-${p.period_no}`}
+                  searchable={false}
+                  exportName={`${selected.slug}-${breakdownYear}-dawirler`}
+                />
+              </div>
+            )}
           </div>
 
           {selected.has_districts && (
