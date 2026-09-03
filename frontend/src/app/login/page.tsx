@@ -51,7 +51,11 @@ function LoginView() {
       <div className="relative z-10 grid w-full max-w-5xl items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
         {/* Chap: brend hikoyasi */}
         <motion.section
-          initial={{ opacity: 0, x: -24 }}
+          // `initial={false}` — betting dáslepki (server-render qılınǵan)
+          // kúyi tuwrıdan-tuwrı "animate" kúyi bolsın. Bolmasa JS
+          // gidratsiya bolǵansha (áste tarmaqta 1 sekundtan aslam) bet
+          // BOS kórinedi — kirüw beti ushın bul júdá durıs emes.
+          initial={false}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="hidden lg:block"
@@ -88,7 +92,7 @@ function LoginView() {
             ].map((s, i) => (
               <motion.div
                 key={s.l}
-                initial={{ opacity: 0, y: 14 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 + i * 0.1 }}
                 className="glass rounded-2xl px-3.5 py-3"
@@ -100,9 +104,11 @@ function LoginView() {
           </div>
         </motion.section>
 
-        {/* O'ng: forma */}
+        {/* O'ng: forma — bul FUNKSIONAL element, sonlıqtan gidratsiya
+            aqırın bolsa da hesh qashan jasırın bolmawı kerek (tómendegi
+            `initial={false}` sonı kepillendiredi). */}
         <motion.section
-          initial={{ opacity: 0, y: 26, scale: 0.97 }}
+          initial={false}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           className="glass glass-top-glow mx-auto w-full max-w-[420px] overflow-hidden rounded-3xl"
