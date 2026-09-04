@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { BarChart3, CheckSquare, MapPin, Table2 } from "lucide-react";
+import { BarChart3, MapPin, Signpost, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HEADER_HEIGHT, NAV_WIDTH } from "@/lib/layout";
 import { useDashboard } from "@/lib/store";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "KPI", icon: BarChart3 },
-  { href: "/tasks", label: "Tapsırmalar", icon: CheckSquare },
+  { href: "/tasks", label: "Jónelisler", icon: Signpost },
   { href: "/districts", label: "Tumanlar", icon: MapPin },
   { href: "/jadval", label: "Jadval", icon: Table2 },
 ];
