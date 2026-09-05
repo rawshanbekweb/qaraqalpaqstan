@@ -1,15 +1,21 @@
 "use client";
 
 /**
- * Jónelis bólimleri (`data/directions.ts`) boyınsha ǵárezsiz hisabatlar.
+ * Jónelis bólimleri (`data/directions.ts`) boyınsha hisabat kesteleri —
+ * backend `/api/directions/report` ustinde, dáwir (q1/h1/m9/year) hám jıl
+ * boyınsha ajratılǵan. `lib/directionDocuments.ts`dagı úlgi qaytalanadı:
+ * `authHeaders()`, JSON qátelik oqıw.
  *
- * Ápiwayı prototip: server API házirshe joq, sonlıqtan hár bólimniń
- * jadvalı brauzerdiń `localStorage`ında saqlanadı (tek usı qurılmada
- * kórinedi). Excel fayldı jükleseń — client tárepte oqılıp, sol jerde
- * kórsetiledi ("translyatsiya"); qolman tolтырыў da usı jadvalǵа jazadı.
+ * Excel fayldı oqıw/jazıw (`parseWorkbookFile`/`downloadReportSheet`) tek
+ * brauzerde islenedi — backend olarǵа qatnaspaydı.
  */
 
 import * as XLSX from "xlsx";
+import { authHeaders } from "@/lib/session";
+import { readError } from "@/lib/admin";
+import type { DirectionPeriod } from "@/lib/directionDocuments";
+
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export interface ReportSheet {
   columns: string[];
@@ -17,40 +23,60 @@ export interface ReportSheet {
   updatedAt: string;
 }
 
-const KEY_PREFIX = "qr-direction-report:";
-
-const DEFAULT_COLUMNS = ["Kórsetkish / Aymaq", "Reje", "Fakt", "Orınlanıw, %", "Eskertpe"];
-
-function storageKey(blockId: string): string {
-  return `${KEY_PREFIX}${blockId}`;
-}
-
-export function loadReportSheet(blockId: string): ReportSheet | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(storageKey(blockId));
-    if (!raw) return null;
-    return JSON.parse(raw) as ReportSheet;
-  } catch {
-    return null;
-  }
-}
-
-export function saveReportSheet(blockId: string, sheet: Omit<ReportSheet, "updatedAt">): ReportSheet {
-  const saved: ReportSheet = { ...sheet, updatedAt: new Date().toISOString() };
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(storageKey(blockId), JSON.stringify(saved));
-  }
-  return saved;
-}
-
-export function clearReportSheet(blockId: string): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(storageKey(blockId));
-}
+export const DEFAULT_COLUMNS = ["Kórsetkish / Aymaq", "Reje", "Fakt", "Orınlanıw, %", "Eskertpe"];
 
 export function emptyReportSheet(): ReportSheet {
   return { columns: [...DEFAULT_COLUMNS], rows: [], updatedAt: new Date().toISOString() };
+}
+
+/** Sáykes dáwir ushın hisabat joq bolsa `null` qaytadı ("ele toltırılmaǵan"). */
+export async function fetchReportSheet(
+  blockId: string,
+  year: number,
+  period: DirectionPeriod,
+): Promise<ReportSheet | null> {
+  const qs = new URLSearchParams({ block_id: blockId, year: String(year), period });
+  const res = await fetch(`${BASE}/api/directions/report?${qs.toString()}`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await readError(res));
+  const data = (await res.json()) as {
+    columns: string[];
+    rows: (string | number | null)[][];
+    updated_at: string;
+  };
+  return { columns: data.columns, rows: data.rows, updatedAt: data.updated_at };
+}
+
+export async function putReportSheet(params: {
+  directionId: string;
+  blockId: string;
+  year: number;
+  period: DirectionPeriod;
+  sheet: Omit<ReportSheet, "updatedAt">;
+}): Promise<ReportSheet> {
+  const res = await fetch(`${BASE}/api/directions/report`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      direction_id: params.directionId,
+      block_id: params.blockId,
+      year: params.year,
+      period: params.period,
+      columns: params.sheet.columns,
+      rows: params.sheet.rows,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  const data = (await res.json()) as {
+    columns: string[];
+    rows: (string | number | null)[][];
+    updated_at: string;
+  };
+  return { columns: data.columns, rows: data.rows, updatedAt: data.updated_at };
 }
 
 /** Júklengen Excel/CSV fayldı bólim jadvalına aylandıradı ("translyatsiya"). */

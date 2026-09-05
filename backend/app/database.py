@@ -40,3 +40,29 @@ def ensure_schema() -> None:
                 "ADD COLUMN IF NOT EXISTS plan_value DOUBLE PRECISION"
             )
         )
+        # `direction_documents` dáslep server diskindegi jolǵа silteme
+        # (`storage_path`) saqlaytuǵın edi; endi fayl baytları tikkeley
+        # bazada (`file_data`) — Render'diń tegin xızmetinde disk
+        # deploy'lar arasında saqlanbaydı. Eski bagana óshirilmeydi (bul
+        # jobadaǵı úlgi — tek qatań emes etiledi), tek jańa bagana qosıladı.
+        conn.execute(
+            text("ALTER TABLE direction_documents ADD COLUMN IF NOT EXISTS file_data BYTEA")
+        )
+        # Jańa (bul jazbadan keyingi) bazada bul bagana ele jaratılmaǵan
+        # bolıwı múmkin (model onı endi jarat­paydı) — sonlıqtan bar-joqlıǵı
+        # aldın tekseriledi.
+        conn.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'direction_documents' AND column_name = 'storage_path'
+                    ) THEN
+                        ALTER TABLE direction_documents ALTER COLUMN storage_path DROP NOT NULL;
+                    END IF;
+                END $$;
+                """
+            )
+        )

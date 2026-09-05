@@ -1,12 +1,14 @@
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     Date,
     DateTime,
     Float,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -181,10 +183,39 @@ class DirectionDocument(Base):
     filename: Mapped[str] = mapped_column(String(300), nullable=False)
     content_type: Mapped[str] = mapped_column(String(120), default="")
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
-    storage_path: Mapped[str] = mapped_column(String(400), nullable=False)
+    #: Fayldıń óz baytları — Render'diń tegin xızmetinde disk deploy'lar
+    #: arasında saqlanbaydı (ephemeral), al baza (Neon) turaqlı
+    file_data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
     uploaded_by: Mapped[str] = mapped_column(String(120), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class DirectionReportSheet(Base):
+    """
+    Bólim ushın "Excel-kórinisindegi" qolman-toltırılatuǵın hisabat kestesi
+    (Reje/Fakt/Orınlanıw%), dáwir hám jıl boyınsha — `DirectionDocument`
+    menen bir sistema, biraq fayl emes, kesте (baǵana atları + qatarlar).
+    """
+
+    __tablename__ = "direction_report_sheets"
+    __table_args__ = (
+        UniqueConstraint("block_id", "year", "period", name="uq_report_sheet"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    direction_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    block_id: Mapped[str] = mapped_column(String(30), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    period: Mapped[str] = mapped_column(String(10), nullable=False)
+
+    columns: Mapped[list] = mapped_column(JSON, nullable=False)
+    rows: Mapped[list] = mapped_column(JSON, nullable=False)
+
+    updated_by: Mapped[str] = mapped_column(String(120), default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class User(Base):

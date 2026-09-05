@@ -7,19 +7,21 @@ import {
   FileSpreadsheet,
   Loader2,
   Plus,
+  Save,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   downloadReportSheet,
   emptyReportSheet,
-  loadReportSheet,
+  fetchReportSheet,
   parseWorkbookFile,
-  saveReportSheet,
+  putReportSheet,
   type ReportSheet,
 } from "@/lib/directionReports";
+import type { DirectionPeriod } from "@/lib/directionDocuments";
 import { getSession } from "@/lib/session";
 import { cn, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
@@ -27,30 +29,82 @@ import { Button } from "@/components/ui/primitives";
 const NO_SUBSCRIBE = () => () => {};
 
 /**
- * Bir jónelis bólimi ushın "excel kórinisindegi" hisabat.
+ * Bir jónelis bólimi ushın "excel kórinisindegi" hisabat, tańlanǵan
+ * (ata component'ten berilgen) dáwir/jıl kesiminde — backend
+ * `/api/directions/report` ustinde (`lib/directionReports.ts`).
  *
- * Backend házirshe joq — jadval brauzerdiń `localStorage`ında saqlanadı
- * (`lib/directionReports.ts`). Admin qolman toltıra yamasa Excel fayl
- * júkley aladı, kóriwshi tek kóredi hám eksportqa aladı.
+ * Admin qolman toltıradı yamasa Excel fayl júkleydi, kóriwshi tek kóredi
+ * hám eksportqa aladı. Excel júklew tikkeley saqlanadı; qolman
+ * ózgerisler bolsa lokal "qoralama" halında jıйnalıp, "Saqlaw" túymesi
+ * menen bazaǵа jiberiledi — hár basıwda soraw jibermew ushın.
  */
-export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exportName: string }) {
+export function ReportSheetPanel({
+  blockId,
+  directionId,
+  year,
+  period,
+  exportName,
+}: {
+  blockId: string;
+  directionId: string;
+  year: number;
+  period: DirectionPeriod;
+  exportName: string;
+}) {
   const isAdmin = useSyncExternalStore(
     NO_SUBSCRIBE,
     () => getSession()?.role === "admin",
     () => false,
   );
-  const [sheet, setSheet] = useState<ReportSheet | null>(() => loadReportSheet(blockId));
+  const [sheet, setSheet] = useState<ReportSheet | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const persist = useCallback(
-    (next: Omit<ReportSheet, "updatedAt">) => {
-      setSheet(saveReportSheet(blockId, next));
-    },
-    [blockId],
-  );
+  const reload = useCallback(() => {
+    fetchReportSheet(blockId, year, period)
+      .then((s) => {
+        setSheet(s);
+        setDirty(false);
+        setError(null);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Hisabat alınbadı"))
+      .finally(() => setLoading(false));
+  }, [blockId, year, period]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  function draft(next: Omit<ReportSheet, "updatedAt">) {
+    setSheet((cur) => ({ ...next, updatedAt: cur?.updatedAt ?? new Date().toISOString() }));
+    setDirty(true);
+  }
+
+  async function save() {
+    if (!sheet) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await putReportSheet({
+        directionId,
+        blockId,
+        year,
+        period,
+        sheet: { columns: sheet.columns, rows: sheet.rows },
+      });
+      setSheet(saved);
+      setDirty(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Hisabat saqlanbadı");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -58,7 +112,15 @@ export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exp
     setError(null);
     try {
       const parsed = await parseWorkbookFile(file);
-      persist(parsed);
+      const saved = await putReportSheet({
+        directionId,
+        blockId,
+        year,
+        period,
+        sheet: { columns: parsed.columns, rows: parsed.rows },
+      });
+      setSheet(saved);
+      setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fayl oqılmadı");
     } finally {
@@ -67,7 +129,7 @@ export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exp
   }
 
   function startEmpty() {
-    persist(emptyReportSheet());
+    draft(emptyReportSheet());
   }
 
   function setCell(ri: number, ci: number, value: string) {
@@ -75,23 +137,23 @@ export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exp
     const rows = sheet.rows.map((row, i) =>
       i === ri ? row.map((c, j) => (j === ci ? value : c)) : row,
     );
-    persist({ columns: sheet.columns, rows });
+    draft({ columns: sheet.columns, rows });
   }
 
   function setHeader(ci: number, value: string) {
     if (!sheet) return;
     const columns = sheet.columns.map((c, i) => (i === ci ? value : c));
-    persist({ columns, rows: sheet.rows });
+    draft({ columns, rows: sheet.rows });
   }
 
   function addRow() {
     if (!sheet) return;
-    persist({ columns: sheet.columns, rows: [...sheet.rows, sheet.columns.map(() => "")] });
+    draft({ columns: sheet.columns, rows: [...sheet.rows, sheet.columns.map(() => "")] });
   }
 
   function addColumn() {
     if (!sheet) return;
-    persist({
+    draft({
       columns: [...sheet.columns, `Baǵana ${sheet.columns.length + 1}`],
       rows: sheet.rows.map((r) => [...r, ""]),
     });
@@ -99,22 +161,31 @@ export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exp
 
   function removeRow(ri: number) {
     if (!sheet) return;
-    persist({ columns: sheet.columns, rows: sheet.rows.filter((_, i) => i !== ri) });
+    draft({ columns: sheet.columns, rows: sheet.rows.filter((_, i) => i !== ri) });
   }
 
   function removeColumn(ci: number) {
     if (!sheet) return;
-    persist({
+    draft({
       columns: sheet.columns.filter((_, i) => i !== ci),
       rows: sheet.rows.map((r) => r.filter((_, i) => i !== ci)),
     });
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl bg-abyss/50 px-4 py-4 text-[12.5px] text-ink-3 ring-1 ring-edge/40">
+        <Loader2 size={14} className="animate-spin" />
+        Júklenbekte…
+      </div>
+    );
   }
 
   if (!sheet) {
     return (
       <div className="rounded-2xl bg-abyss/50 p-5 text-center ring-1 ring-edge/40">
         <FileSpreadsheet size={22} className="mx-auto mb-2 text-ink-3" />
-        <p className="text-[13.5px] text-ink-3">Bul bólim ushın hisabat ele engizilmegen.</p>
+        <p className="text-[13.5px] text-ink-3">Bul dáwir ushın hisabat ele engizilmegen.</p>
         {isAdmin ? (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <Button type="button" onClick={startEmpty} variant="outline">
@@ -167,7 +238,7 @@ export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exp
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[12px] text-ink-3">
-          Sońǵı jańalanıw: {formatDate(sheet.updatedAt.slice(0, 10))}
+          {dirty ? "Saqlanbaǵan ózgerisler bar" : `Sońǵı jańalanıw: ${formatDate(sheet.updatedAt.slice(0, 10))}`}
         </span>
         <div className="flex-1" />
         <button
@@ -216,6 +287,10 @@ export function ReportSheetPanel({ blockId, exportName }: { blockId: string; exp
               <Plus size={13} />
               Qatar
             </button>
+            <Button type="button" onClick={() => void save()} disabled={!dirty || saving}>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Saqlaw
+            </Button>
           </>
         )}
       </div>

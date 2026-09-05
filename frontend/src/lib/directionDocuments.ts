@@ -89,6 +89,27 @@ export async function uploadDirectionDocument(params: {
   return (await res.json()) as DirectionDocument;
 }
 
+export interface DirectionBlockCoverage {
+  direction_id: string;
+  block_id: string;
+  document_count: number;
+  has_report: boolean;
+}
+
+/** Tańlanǵan dáwir ushın hár bólimniń hújjet/hisabat bar-joqlıǵı — analitika panelinde. */
+export async function fetchDirectionSummary(
+  year: number,
+  period: DirectionPeriod,
+): Promise<DirectionBlockCoverage[]> {
+  const qs = new URLSearchParams({ year: String(year), period });
+  const res = await fetch(`${BASE}/api/directions/summary?${qs.toString()}`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as DirectionBlockCoverage[];
+}
+
 export async function deleteDirectionDocument(id: number): Promise<void> {
   const res = await fetch(`${BASE}/api/directions/documents/${id}`, {
     method: "DELETE",

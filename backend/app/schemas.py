@@ -165,6 +165,35 @@ class DirectionDocumentOut(BaseModel):
     created_at: datetime
 
 
+class DirectionReportSheetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    direction_id: str
+    block_id: str
+    year: int
+    period: DirectionPeriod
+    columns: list[str]
+    rows: list[list[str | float | None]]
+    updated_by: str
+    updated_at: datetime
+
+
+class DirectionReportSheetIn(BaseModel):
+    direction_id: str
+    block_id: str
+    year: int
+    period: DirectionPeriod
+    columns: list[str]
+    rows: list[list[str | float | None]]
+
+
+class DirectionBlockCoverage(BaseModel):
+    direction_id: str
+    block_id: str
+    document_count: int
+    has_report: bool
+
+
 # ── Paydalanıwshılar (admin) ────────────────────────────────────────
 
 

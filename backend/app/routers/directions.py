@@ -1,26 +1,34 @@
-"""Jónelis bólimlerine baylanıslı hújjetler (fayl-qosımshalar).
+"""Jónelis bólimlerine baylanıslı hújjetler hám hisabat kesteleri.
 
 Bólimlerdiń ózi (tekst, jetekshiler) `frontend/src/data/directions.ts`da
-statik saqlanadı — bul jerde tek sol bólimlerge júklengen fayllardıń
-ma'lumatnaması. Oqıw ushın auth talap etilmeydi (`stats.py`daǵı GET
-endpointleri sıyaqlı), tek júklew/óshiriw admin huqıqın talap etedi.
+statik saqlanadı — bul jerde tek sol bólimlerge júklengen fayllar,
+qolman-toltırılatuǵın hisabat kesteleri hám olardıń qısqasha kórinisi
+(summary). Oqıw ushın auth talap etilmeydi (`stats.py`daǵı GET
+endpointleri sıyaqlı), tek jazıw/óshiriw admin huqıqın talap etedi.
+
+Fayl baytları tikkeley bazada (`file_data`, bytea) saqlanadı — server
+diski Render'diń tegin xızmetinde deploy'lar arasında saqlanbaydı
+(ephemeral), al baza (Neon) turaqlı.
 """
 
 from __future__ import annotations
 
 import os
-import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.database import get_db
-from app.models import DirectionDocument, User
-from app.schemas import DirectionDocumentOut, DirectionPeriod
+from app.models import DirectionDocument, DirectionReportSheet, User
+from app.schemas import (
+    DirectionBlockCoverage,
+    DirectionDocumentOut,
+    DirectionPeriod,
+    DirectionReportSheetIn,
+    DirectionReportSheetOut,
+)
 from app.security import current_user, require_admin
 
 router = APIRouter(prefix="/api/directions", tags=["directions"])
@@ -32,10 +40,7 @@ _MAX_SIZE_BYTES = 25 * 1024 * 1024
 _PERIODS = {"q1", "h1", "m9", "year"}
 
 
-def _documents_root() -> Path:
-    root = Path(get_settings().uploads_dir) / "directions"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+# ── Hújjetler ────────────────────────────────────────────────────────
 
 
 @router.get("/documents", response_model=list[DirectionDocumentOut])
@@ -87,11 +92,6 @@ async def upload_document(
     if not data:
         raise HTTPException(400, "Fayl bos")
 
-    block_dir = _documents_root() / block_id
-    block_dir.mkdir(parents=True, exist_ok=True)
-    stored_name = f"{uuid.uuid4().hex}-{original_name}"
-    (block_dir / stored_name).write_bytes(data)
-
     doc = DirectionDocument(
         direction_id=direction_id,
         block_id=block_id,
@@ -101,7 +101,7 @@ async def upload_document(
         filename=original_name,
         content_type=file.content_type or "",
         size_bytes=len(data),
-        storage_path=str(Path("directions") / block_id / stored_name),
+        file_data=data,
         uploaded_by=user.username,
     )
     db.add(doc)
@@ -116,14 +116,10 @@ def download_document(document_id: int, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(404, "Hújjet tabılmadı")
 
-    path = Path(get_settings().uploads_dir) / doc.storage_path
-    if not path.is_file():
-        raise HTTPException(404, "Fayl serverde tabılmadı")
-
-    return FileResponse(
-        path,
-        filename=doc.filename,
+    return Response(
+        content=doc.file_data,
         media_type=doc.content_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
     )
 
 
@@ -132,10 +128,108 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
     doc = db.get(DirectionDocument, document_id)
     if not doc:
         raise HTTPException(404, "Hújjet tabılmadı")
-
-    path = Path(get_settings().uploads_dir) / doc.storage_path
-    if path.is_file():
-        path.unlink()
-
     db.delete(doc)
     db.commit()
+
+
+# ── Hisabat kesteleri ───────────────────────────────────────────────
+
+
+@router.get("/report", response_model=DirectionReportSheetOut)
+def get_report(
+    block_id: str,
+    year: int,
+    period: DirectionPeriod,
+    db: Session = Depends(get_db),
+):
+    sheet = db.scalar(
+        select(DirectionReportSheet).where(
+            DirectionReportSheet.block_id == block_id,
+            DirectionReportSheet.year == year,
+            DirectionReportSheet.period == period,
+        )
+    )
+    if not sheet:
+        raise HTTPException(404, "Bul dáwir ushın hisabat ele toltırılmaǵan")
+    return sheet
+
+
+@router.put(
+    "/report",
+    response_model=DirectionReportSheetOut,
+    dependencies=[Depends(require_admin)],
+)
+def put_report(
+    payload: DirectionReportSheetIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    sheet = db.scalar(
+        select(DirectionReportSheet).where(
+            DirectionReportSheet.block_id == payload.block_id,
+            DirectionReportSheet.year == payload.year,
+            DirectionReportSheet.period == payload.period,
+        )
+    )
+    if not sheet:
+        sheet = DirectionReportSheet(
+            direction_id=payload.direction_id,
+            block_id=payload.block_id,
+            year=payload.year,
+            period=payload.period,
+        )
+        db.add(sheet)
+
+    sheet.columns = payload.columns
+    sheet.rows = payload.rows
+    sheet.updated_by = user.username
+    db.commit()
+    db.refresh(sheet)
+    return sheet
+
+
+# ── Qısqasha kórinis (analitika) ────────────────────────────────────
+
+
+@router.get("/summary", response_model=list[DirectionBlockCoverage])
+def summary(year: int, period: DirectionPeriod, db: Session = Depends(get_db)):
+    doc_rows = db.execute(
+        select(
+            DirectionDocument.direction_id,
+            DirectionDocument.block_id,
+            func.count(DirectionDocument.id),
+        )
+        .where(DirectionDocument.year == year, DirectionDocument.period == period)
+        .group_by(DirectionDocument.direction_id, DirectionDocument.block_id)
+    ).all()
+    report_blocks = set(
+        db.scalars(
+            select(DirectionReportSheet.block_id).where(
+                DirectionReportSheet.year == year, DirectionReportSheet.period == period
+            )
+        ).all()
+    )
+
+    covered: dict[str, DirectionBlockCoverage] = {
+        block_id: DirectionBlockCoverage(
+            direction_id=direction_id,
+            block_id=block_id,
+            document_count=count,
+            has_report=block_id in report_blocks,
+        )
+        for direction_id, block_id, count in doc_rows
+    }
+    for sheet in db.scalars(
+        select(DirectionReportSheet).where(
+            DirectionReportSheet.year == year, DirectionReportSheet.period == period
+        )
+    ):
+        if sheet.block_id not in covered:
+            covered[sheet.block_id] = DirectionBlockCoverage(
+                direction_id=sheet.direction_id,
+                block_id=sheet.block_id,
+                document_count=0,
+                has_report=True,
+            )
+
+    return list(covered.values())

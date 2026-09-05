@@ -7,6 +7,12 @@ import { DIRECTIONS, DIRECTIONS_CLOSING_NOTE, type Direction, type DirectionBloc
 import { cn } from "@/lib/utils";
 import { ReportSheetPanel } from "@/components/directions/ReportSheetPanel";
 import { DirectionDocuments } from "@/components/directions/DirectionDocuments";
+import { DirectionsOverview } from "@/components/directions/DirectionsOverview";
+import { currentDirectionPeriod, PERIOD_LABELS, PERIOD_ORDER, type DirectionPeriod } from "@/lib/directionDocuments";
+import { Segmented, YearScale } from "@/components/ui/primitives";
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 const CARD_ACCENTS = [
   "#22d3ee",
@@ -50,8 +56,10 @@ export function DirectionExplorer() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22 }}
-            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            className="space-y-5"
           >
+            <DirectionsOverview />
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {DIRECTIONS.map((d, i) => (
               <DirectionCard
                 key={d.id}
@@ -61,6 +69,7 @@ export function DirectionExplorer() {
                 onOpen={() => openDirection(d.id)}
               />
             ))}
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -192,6 +201,9 @@ function BlockRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [period, setPeriod] = useState<DirectionPeriod>(() => currentDirectionPeriod());
+
   return (
     <div className={cn("bg-abyss/40", index > 0 && "border-t border-hairline/50")}>
       <button
@@ -227,8 +239,24 @@ function BlockRow({
             className="overflow-hidden"
           >
             <div className="space-y-4 border-t border-hairline/50 bg-abyss/60 p-4">
-              <ReportSheetPanel blockId={block.id} exportName={`${directionTitle}-${index + 1}`} />
-              <DirectionDocuments blockId={block.id} directionId={directionId} />
+              <div className="flex flex-wrap items-center gap-2">
+                <YearScale years={YEARS} value={year} onChange={setYear} />
+                <Segmented
+                  layoutId={`direction-period-${block.id}`}
+                  size="sm"
+                  value={period}
+                  onChange={setPeriod}
+                  options={PERIOD_ORDER.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))}
+                />
+              </div>
+              <ReportSheetPanel
+                blockId={block.id}
+                directionId={directionId}
+                year={year}
+                period={period}
+                exportName={`${directionTitle}-${index + 1}`}
+              />
+              <DirectionDocuments blockId={block.id} directionId={directionId} year={year} period={period} />
             </div>
           </motion.div>
         )}

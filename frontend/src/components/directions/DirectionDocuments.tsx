@@ -3,24 +3,19 @@
 import { AlertTriangle, Download, FileText, Loader2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
-  currentDirectionPeriod,
   deleteDirectionDocument,
   directionDocumentsConfigured,
   downloadDirectionDocument,
   listDirectionDocuments,
   PERIOD_LABELS,
-  PERIOD_ORDER,
   uploadDirectionDocument,
   type DirectionDocument,
   type DirectionPeriod,
 } from "@/lib/directionDocuments";
 import { getSession } from "@/lib/session";
 import { cn, formatDate } from "@/lib/utils";
-import { Segmented, YearScale } from "@/components/ui/primitives";
 
 const NO_SUBSCRIBE = () => () => {};
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -29,25 +24,27 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * Bir jónelis bólimi ushın dáwir (I-shárek / I-yarım jıl / 9 ay / jıl
- * juwmaǵı) boyınsha ajratılǵan hújjet dizimi. `ReportSheetPanel`diń
- * astında kórsetiledi — admin fayl qosadı/óshiredi, basqalar tek kóredi
- * hám júklep aladı (huqıq server tárepte `require_admin` menen tekseriledi).
+ * Bir jónelis bólimi ushın (ata component'ten berilgen) dáwir/jıl kesiminde
+ * hújjet dizimi. `ReportSheetPanel`diń astında kórsetiledi — admin fayl
+ * qosadı/óshiredi, basqalar tek kóredi hám júklep aladı (huqıq server
+ * tárepte `require_admin` menen tekseriledi).
  */
 export function DirectionDocuments({
   blockId,
   directionId,
+  year,
+  period,
 }: {
   blockId: string;
   directionId: string;
+  year: number;
+  period: DirectionPeriod;
 }) {
   const isAdmin = useSyncExternalStore(
     NO_SUBSCRIBE,
     () => getSession()?.role === "admin",
     () => false,
   );
-  const [year, setYear] = useState(CURRENT_YEAR);
-  const [period, setPeriod] = useState<DirectionPeriod>(() => currentDirectionPeriod());
   const [docs, setDocs] = useState<DirectionDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -107,21 +104,9 @@ export function DirectionDocuments({
 
   return (
     <div className="space-y-3 border-t border-hairline/50 pt-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[12px] font-semibold tracking-wide text-ink-3 uppercase">
-          <FileText size={13} />
-          Hújjetler
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <YearScale years={YEARS} value={year} onChange={setYear} />
-          <Segmented
-            layoutId={`direction-period-${blockId}`}
-            size="sm"
-            value={period}
-            onChange={setPeriod}
-            options={PERIOD_ORDER.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))}
-          />
-        </div>
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold tracking-wide text-ink-3 uppercase">
+        <FileText size={13} />
+        Hújjetler
       </div>
 
       {error && (
