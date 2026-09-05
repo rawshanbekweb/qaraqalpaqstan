@@ -7,7 +7,6 @@ import { DIRECTIONS, DIRECTIONS_CLOSING_NOTE, type Direction, type DirectionBloc
 import { cn } from "@/lib/utils";
 import { ReportSheetPanel } from "@/components/directions/ReportSheetPanel";
 import { DirectionDocuments } from "@/components/directions/DirectionDocuments";
-import { DirectionsOverview } from "@/components/directions/DirectionsOverview";
 import {
   currentDirectionPeriod,
   directionDocumentsConfigured,
@@ -78,10 +77,8 @@ export function DirectionExplorer() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22 }}
-            className="space-y-5"
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
           >
-            <DirectionsOverview />
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {DIRECTIONS.map((d, i) => (
               <DirectionCard
                 key={d.id}
@@ -91,7 +88,6 @@ export function DirectionExplorer() {
                 onOpen={() => openDirection(d.id)}
               />
             ))}
-            </div>
           </motion.div>
         ) : (
           <motion.div
