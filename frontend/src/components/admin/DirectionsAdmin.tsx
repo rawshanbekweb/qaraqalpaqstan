@@ -2,7 +2,7 @@
 
 import { CalendarClock, Loader2, Search, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DIRECTIONS } from "@/data/directions";
+import { DIRECTIONS, directionLeafBlocks } from "@/data/directions";
 import { TASK_STATUS_LIST, taskStatus } from "@/data/modules";
 import type { TaskStatusId } from "@/data/modules";
 import {
@@ -62,7 +62,7 @@ export function DirectionsAdmin() {
   const allRows: Row[] = useMemo(
     () =>
       DIRECTIONS.flatMap((d) =>
-        d.blocks.map((b, i) => {
+        directionLeafBlocks(d).map((b, i) => {
           const s = statuses.get(b.id);
           return {
             directionId: d.id,
@@ -70,7 +70,7 @@ export function DirectionsAdmin() {
             directionLabel: `${d.order}. ${d.title.split(" ")[0]}`,
             blockId: b.id,
             blockIndex: i + 1,
-            text: b.text,
+            text: b.parentText ? `${b.parentText} — ${b.text}` : b.text,
             progress: s?.progress ?? 0,
             deadline: s?.deadline ?? `${year}-12-31`,
             assignee: s?.assignee ?? "",
