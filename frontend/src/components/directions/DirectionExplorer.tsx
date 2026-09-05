@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { DIRECTIONS, DIRECTIONS_CLOSING_NOTE, type Direction, type DirectionBlock } from "@/data/directions";
 import { cn } from "@/lib/utils";
 import { ReportSheetPanel } from "@/components/directions/ReportSheetPanel";
+import { DirectionDocuments } from "@/components/directions/DirectionDocuments";
 
 const CARD_ACCENTS = [
   "#22d3ee",
@@ -95,6 +96,7 @@ export function DirectionExplorer() {
                   key={block.id}
                   block={block}
                   index={i}
+                  directionId={active.id}
                   directionTitle={active.title}
                   expanded={expandedBlockId === block.id}
                   onToggle={() =>
@@ -178,12 +180,14 @@ function DirectionCard({
 function BlockRow({
   block,
   index,
+  directionId,
   directionTitle,
   expanded,
   onToggle,
 }: {
   block: DirectionBlock;
   index: number;
+  directionId: string;
   directionTitle: string;
   expanded: boolean;
   onToggle: () => void;
@@ -222,8 +226,9 @@ function BlockRow({
             transition={{ duration: 0.22 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-hairline/50 bg-abyss/60 p-4">
+            <div className="space-y-4 border-t border-hairline/50 bg-abyss/60 p-4">
               <ReportSheetPanel blockId={block.id} exportName={`${directionTitle}-${index + 1}`} />
+              <DirectionDocuments blockId={block.id} directionId={directionId} />
             </div>
           </motion.div>
         )}

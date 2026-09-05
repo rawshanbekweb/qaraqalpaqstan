@@ -155,6 +155,38 @@ class StatObservation(Base):
     indicator: Mapped[StatIndicator] = relationship(back_populates="observations")
 
 
+class DirectionDocument(Base):
+    """
+    Jónelis bólimine (`frontend/src/data/directions.ts`daǵı block_id) baylanıslı
+    júklengen hújjet (PDF/Excel/Word esabat), dáwir (q1/h1/m9/year) hám jıl
+    boyınsha ajratılǵan.
+
+    `direction_id`/`block_id` frontenttegi statik dizimdi kórsetedi — bazada
+    bólek ma'lumotnoma keste joq, sebebi bólim tekstleri húdjetten alınǵan
+    turaqlı kontent, olardı kóshirip alıw artıqsha.
+    """
+
+    __tablename__ = "direction_documents"
+    __table_args__ = (
+        Index("ix_direction_document_lookup", "block_id", "year", "period"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    direction_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    block_id: Mapped[str] = mapped_column(String(30), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    period: Mapped[str] = mapped_column(String(10), nullable=False)
+
+    title: Mapped[str] = mapped_column(String(300), default="")
+    filename: Mapped[str] = mapped_column(String(300), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), default="")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    storage_path: Mapped[str] = mapped_column(String(400), nullable=False)
+
+    uploaded_by: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class User(Base):
     """Platforma foydalanuvchisi (admin yoki ko'ruvchi)."""
 

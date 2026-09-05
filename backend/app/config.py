@@ -22,6 +22,10 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000,http://localhost:3100"
 
+    #: Jónelis hújjetleri (júklengen fayllar) saqlanatuǵın papka — server
+    #: diskindegi salıstırmalı yamasa tolıq jol
+    uploads_dir: str = "uploads"
+
     # `admin`/`rahbar` demo esapları ushın parol — berilmese `seed.py`
     # (tek jańa bazada, esap ele joq bolǵanda) qátelesiwi qıyın kездейсоқ
     # parol jaratadı hám ony bir márte log'ǵa jazadı. Belgili parol

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import SessionLocal, ensure_schema
-from app.routers import ai, auth, data, stats, users
+from app.routers import ai, auth, data, directions, stats, users
 from app.seed import seed_reference, seed_users
 
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +49,7 @@ app.include_router(data.router)
 app.include_router(stats.router)
 app.include_router(ai.router)
 app.include_router(users.router)
+app.include_router(directions.router)
 
 
 @app.get("/api/health")

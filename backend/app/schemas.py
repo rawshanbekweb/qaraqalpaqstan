@@ -144,6 +144,27 @@ class TokenResponse(BaseModel):
     role: str
 
 
+# ── Jónelis hújjetleri ──────────────────────────────────────────────
+
+DirectionPeriod = Literal["q1", "h1", "m9", "year"]
+
+
+class DirectionDocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    direction_id: str
+    block_id: str
+    year: int
+    period: DirectionPeriod
+    title: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_by: str
+    created_at: datetime
+
+
 # ── Paydalanıwshılar (admin) ────────────────────────────────────────
 
 
