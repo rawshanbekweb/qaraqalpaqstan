@@ -218,6 +218,35 @@ class DirectionReportSheet(Base):
     )
 
 
+class DirectionBlockStatus(Base):
+    """
+    Bólim ushın admin-basqaratuǵın tapsırma jaǵdayı: juwapker, múddet,
+    orınlanıw payızı — jıl boyınsha (dáwir emes, sebebi bir tapsırma
+    pútkil jıl boyı dawam etedi). Status tikkeley bul jerde saqlanbaydı —
+    frontend `taskStatus(progress, deadline)` arqalı esaplaydı (TaskBoard
+    menen bir logika, eki jerde qайtalanbasın dep).
+    """
+
+    __tablename__ = "direction_block_status"
+    __table_args__ = (
+        UniqueConstraint("block_id", "year", name="uq_block_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    direction_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    block_id: Mapped[str] = mapped_column(String(30), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    assignee: Mapped[str] = mapped_column(String(120), default="")
+
+    updated_by: Mapped[str] = mapped_column(String(120), default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class User(Base):
     """Platforma foydalanuvchisi (admin yoki ko'ruvchi)."""
 

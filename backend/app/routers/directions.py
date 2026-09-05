@@ -21,9 +21,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DirectionDocument, DirectionReportSheet, User
+from app.models import DirectionBlockStatus, DirectionDocument, DirectionReportSheet, User
 from app.schemas import (
     DirectionBlockCoverage,
+    DirectionBlockStatusIn,
+    DirectionBlockStatusOut,
     DirectionDocumentOut,
     DirectionPeriod,
     DirectionReportSheetIn,
@@ -233,3 +235,55 @@ def summary(year: int, period: DirectionPeriod, db: Session = Depends(get_db)):
             )
 
     return list(covered.values())
+
+
+# ── Bólim tapsırma jaǵdayı (admin panel) ────────────────────────────
+#
+# Hújjetler/hisabatlardan parıqlı: bul maǵlıwmat (juwapker, múddet,
+# orınlanıw payızı) tek admin panelde islenedi, sonlıqtan oqıw da
+# kirgen paydalanıwshı ushın ǵana (kóz-qarastaǵı `stats.py`/hújjetler
+# API'lerindey ashıq emes).
+
+
+@router.get(
+    "/status",
+    response_model=list[DirectionBlockStatusOut],
+    dependencies=[Depends(current_user)],
+)
+def list_block_status(year: int, db: Session = Depends(get_db)):
+    return db.scalars(
+        select(DirectionBlockStatus).where(DirectionBlockStatus.year == year)
+    ).all()
+
+
+@router.put(
+    "/status",
+    response_model=DirectionBlockStatusOut,
+    dependencies=[Depends(require_admin)],
+)
+def put_block_status(
+    payload: DirectionBlockStatusIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    row = db.scalar(
+        select(DirectionBlockStatus).where(
+            DirectionBlockStatus.block_id == payload.block_id,
+            DirectionBlockStatus.year == payload.year,
+        )
+    )
+    if not row:
+        row = DirectionBlockStatus(
+            direction_id=payload.direction_id,
+            block_id=payload.block_id,
+            year=payload.year,
+        )
+        db.add(row)
+
+    row.progress = payload.progress
+    row.deadline = payload.deadline
+    row.assignee = payload.assignee.strip()
+    row.updated_by = user.username
+    db.commit()
+    db.refresh(row)
+    return row

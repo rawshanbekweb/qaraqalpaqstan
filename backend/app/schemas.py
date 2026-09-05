@@ -194,6 +194,28 @@ class DirectionBlockCoverage(BaseModel):
     has_report: bool
 
 
+class DirectionBlockStatusOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    direction_id: str
+    block_id: str
+    year: int
+    progress: int
+    deadline: date | None
+    assignee: str
+    updated_by: str
+    updated_at: datetime
+
+
+class DirectionBlockStatusIn(BaseModel):
+    direction_id: str
+    block_id: str
+    year: int
+    progress: int = Field(default=0, ge=0, le=100)
+    deadline: date | None = None
+    assignee: str = ""
+
+
 # ── Paydalanıwshılar (admin) ────────────────────────────────────────
 
 

@@ -18,12 +18,13 @@ import { AuroraBackground } from "@/components/ui/AuroraBackground";
 import { AdminTopBar } from "@/components/layout/TopBar";
 import { Panel, Segmented } from "@/components/ui/primitives";
 import { DataExport } from "@/components/admin/DataExport";
+import { DirectionsAdmin } from "@/components/admin/DirectionsAdmin";
 import { IndicatorBrowser } from "@/components/admin/IndicatorBrowser";
 import { StatUpload } from "@/components/admin/StatUpload";
 import { TaskBoard } from "@/components/admin/TaskBoard";
 import { UserManager } from "@/components/admin/UserManager";
 
-type Tab = "state" | "upload" | "indicators" | "users" | "tasks";
+type Tab = "state" | "upload" | "indicators" | "users" | "tasks" | "directions";
 
 /**
  * Admin panel.
@@ -122,6 +123,7 @@ export default function AdminPage() {
                   { value: "upload", label: "Excel júklew" },
                   { value: "indicators", label: "Kórsetkishler" },
                   { value: "users", label: "Paydalanıwshılar" },
+                  { value: "directions", label: "Jónelisler" },
                   { value: "tasks", label: "Tapsırmalar" },
                 ]}
               />
@@ -162,6 +164,8 @@ export default function AdminPage() {
                   )}
 
                   {tab === "users" && <UserManager />}
+
+                  {tab === "directions" && <DirectionsAdmin />}
 
                   {tab === "tasks" && <TaskBoard />}
                 </motion.div>
