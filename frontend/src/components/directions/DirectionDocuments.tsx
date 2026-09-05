@@ -34,11 +34,13 @@ export function DirectionDocuments({
   directionId,
   year,
   period,
+  onChanged,
 }: {
   blockId: string;
   directionId: string;
   year: number;
   period: DirectionPeriod;
+  onChanged?: () => void;
 }) {
   const isAdmin = useSyncExternalStore(
     NO_SUBSCRIBE,
@@ -74,6 +76,7 @@ export function DirectionDocuments({
     try {
       await uploadDirectionDocument({ directionId, blockId, year, period, file });
       reload();
+      onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fayl júklenbedi");
     } finally {
@@ -87,6 +90,7 @@ export function DirectionDocuments({
     try {
       await deleteDirectionDocument(doc.id);
       setDocs((cur) => cur.filter((d) => d.id !== doc.id));
+      onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Hújjet óshirilmedi");
     } finally {

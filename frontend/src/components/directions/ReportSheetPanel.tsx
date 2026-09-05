@@ -44,12 +44,14 @@ export function ReportSheetPanel({
   year,
   period,
   exportName,
+  onChanged,
 }: {
   blockId: string;
   directionId: string;
   year: number;
   period: DirectionPeriod;
   exportName: string;
+  onChanged?: () => void;
 }) {
   const isAdmin = useSyncExternalStore(
     NO_SUBSCRIBE,
@@ -99,6 +101,7 @@ export function ReportSheetPanel({
       });
       setSheet(saved);
       setDirty(false);
+      onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Hisabat saqlanbadı");
     } finally {
@@ -121,6 +124,7 @@ export function ReportSheetPanel({
       });
       setSheet(saved);
       setDirty(false);
+      onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fayl oqılmadı");
     } finally {

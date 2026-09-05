@@ -2,13 +2,21 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, ChevronLeft, ChevronRight, Layers, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DIRECTIONS, DIRECTIONS_CLOSING_NOTE, type Direction, type DirectionBlock } from "@/data/directions";
 import { cn } from "@/lib/utils";
 import { ReportSheetPanel } from "@/components/directions/ReportSheetPanel";
 import { DirectionDocuments } from "@/components/directions/DirectionDocuments";
 import { DirectionsOverview } from "@/components/directions/DirectionsOverview";
-import { currentDirectionPeriod, PERIOD_LABELS, PERIOD_ORDER, type DirectionPeriod } from "@/lib/directionDocuments";
+import {
+  currentDirectionPeriod,
+  directionDocumentsConfigured,
+  fetchDirectionSummary,
+  PERIOD_LABELS,
+  PERIOD_ORDER,
+  type DirectionBlockCoverage,
+  type DirectionPeriod,
+} from "@/lib/directionDocuments";
 import { Segmented, YearScale } from "@/components/ui/primitives";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -34,7 +42,21 @@ const CARD_ACCENTS = [
 export function DirectionExplorer() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [expandedBlockId, setExpandedBlockId] = useState<string | null>(null);
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [period, setPeriod] = useState<DirectionPeriod>(() => currentDirectionPeriod());
+  const [coverage, setCoverage] = useState<Map<string, DirectionBlockCoverage>>(new Map());
   const active = useMemo(() => DIRECTIONS.find((d) => d.id === activeId) ?? null, [activeId]);
+
+  const reloadCoverage = useCallback(() => {
+    if (!active || !directionDocumentsConfigured()) return;
+    fetchDirectionSummary(year, period)
+      .then((rows) => setCoverage(new Map(rows.map((r) => [r.block_id, r]))))
+      .catch(() => setCoverage(new Map()));
+  }, [active, year, period]);
+
+  useEffect(() => {
+    void reloadCoverage();
+  }, [reloadCoverage]);
 
   function openDirection(id: string) {
     setActiveId(id);
@@ -97,6 +119,16 @@ export function DirectionExplorer() {
                   </p>
                 )}
               </div>
+              <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                <YearScale years={YEARS} value={year} onChange={setYear} />
+                <Segmented
+                  layoutId="direction-period"
+                  size="sm"
+                  value={period}
+                  onChange={setPeriod}
+                  options={PERIOD_ORDER.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))}
+                />
+              </div>
             </div>
 
             <div className="overflow-hidden rounded-2xl ring-1 ring-edge/50">
@@ -107,6 +139,10 @@ export function DirectionExplorer() {
                   index={i}
                   directionId={active.id}
                   directionTitle={active.title}
+                  year={year}
+                  period={period}
+                  coverage={coverage.get(block.id) ?? null}
+                  onChanged={reloadCoverage}
                   expanded={expandedBlockId === block.id}
                   onToggle={() =>
                     setExpandedBlockId((cur) => (cur === block.id ? null : block.id))
@@ -191,6 +227,10 @@ function BlockRow({
   index,
   directionId,
   directionTitle,
+  year,
+  period,
+  coverage,
+  onChanged,
   expanded,
   onToggle,
 }: {
@@ -198,11 +238,17 @@ function BlockRow({
   index: number;
   directionId: string;
   directionTitle: string;
+  year: number;
+  period: DirectionPeriod;
+  coverage: DirectionBlockCoverage | null;
+  onChanged: () => void;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const [year, setYear] = useState(CURRENT_YEAR);
-  const [period, setPeriod] = useState<DirectionPeriod>(() => currentDirectionPeriod());
+  const active = Boolean(coverage && (coverage.document_count > 0 || coverage.has_report));
+  const statusTitle = active
+    ? `${PERIOD_LABELS[period]}, ${year}: ${coverage?.document_count ?? 0} hújjet${coverage?.has_report ? " + hisabat kestesi" : ""}`
+    : `${PERIOD_LABELS[period]}, ${year}: hújjet/hisabat ele joq`;
 
   return (
     <div className={cn("bg-abyss/40", index > 0 && "border-t border-hairline/50")}>
@@ -217,6 +263,13 @@ function BlockRow({
         <span className="mt-0.5 shrink-0 rounded-md bg-abyss/70 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-ink-3 ring-1 ring-edge/50">
           {index + 1}
         </span>
+        <span
+          title={statusTitle}
+          className={cn(
+            "mt-2 size-2 shrink-0 rounded-full",
+            active ? "bg-[#34d399] shadow-[0_0_6px_1px_rgba(52,211,153,0.55)]" : "ring-1 ring-edge/60",
+          )}
+        />
         <span className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-ink-2">{block.text}</span>
         {block.ownerGroup && (
           <span className="mt-0.5 hidden shrink-0 rounded-full bg-iris/12 px-2 py-0.5 text-[11px] font-medium text-iris ring-1 ring-iris/25 sm:inline-block">
@@ -239,24 +292,21 @@ function BlockRow({
             className="overflow-hidden"
           >
             <div className="space-y-4 border-t border-hairline/50 bg-abyss/60 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <YearScale years={YEARS} value={year} onChange={setYear} />
-                <Segmented
-                  layoutId={`direction-period-${block.id}`}
-                  size="sm"
-                  value={period}
-                  onChange={setPeriod}
-                  options={PERIOD_ORDER.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))}
-                />
-              </div>
               <ReportSheetPanel
                 blockId={block.id}
                 directionId={directionId}
                 year={year}
                 period={period}
                 exportName={`${directionTitle}-${index + 1}`}
+                onChanged={onChanged}
               />
-              <DirectionDocuments blockId={block.id} directionId={directionId} year={year} period={period} />
+              <DirectionDocuments
+                blockId={block.id}
+                directionId={directionId}
+                year={year}
+                period={period}
+                onChanged={onChanged}
+              />
             </div>
           </motion.div>
         )}
